@@ -16,6 +16,7 @@
     "db:studio": "cd apps/web && pnpm exec prisma studio"
   },
   "devDependencies": {
+    "prisma": "^5.22.0",
     "turbo": "^2.0.0"
   }
 }
