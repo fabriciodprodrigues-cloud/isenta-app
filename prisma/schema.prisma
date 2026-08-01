@@ -1,0 +1,131 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("viewer") // admin | operator | viewer
+  accountId String?
+  account   Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([email])
+}
+
+model Account {
+  id                 String   @id @default(cuid())
+  name               String
+  cnpj               String   @unique
+  status             String   @default("pending") // pending | active | inactive
+  responsibleName    String
+  responsibleEmail   String
+  responsiblePhone   String
+  address            String
+  city               String
+  state              String   @db.Char(2)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  users     User[]
+  vehicles  Vehicle[]
+  alerts    Alert[]
+
+  @@index([cnpj])
+  @@index([status])
+}
+
+model Vehicle {
+  id                String   @id @default(cuid())
+  accountId         String
+  account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  plate             String
+  renavam           String
+  type              String   // proprio | locado
+  category          String   // oficial | ambulancia | bombeiro | outro
+  status            String   @default("rascunho") // rascunho | enviado | aguardando | aprovado | recusado | vencido
+
+  documentUrl       String?
+  contractUrl       String?  // se locado
+  crlvUrl           String?
+  tagSerialNumber   String?
+
+  expiresAt         DateTime?
+  lastRenewalAt     DateTime?
+  lastAlertSentAt   DateTime? // para não enviar múltiplos alertas no mesmo dia
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  registrations ConcesssionaireRegistration[]
+  alerts        Alert[]
+
+  @@unique([accountId, plate])
+  @@index([accountId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model ConcesssionaireRegistration {
+  id                String   @id @default(cuid())
+  vehicleId         String
+  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  concessionnaire   String   // ccr_prvias, csg_gaucha, etc
+  status            String   @default("rascunho") // rascunho | enviado | aguardando_resposta | aprovado | recusado
+  protocol          String?
+
+  sentAt            DateTime?
+  approvedAt        DateTime?
+  rejectionReason   String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([vehicleId, concessionnaire])
+  @@index([vehicleId])
+  @@index([status])
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  accountId String
+  account   Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  vehicleId String
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  type      String   // expiring_soon | expired | renewal_needed
+  daysUntilExpiry Int
+  sentAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([accountId])
+  @@index([vehicleId])
+  @@index([type])
+  @@index([sentAt])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expires   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expires])
+}

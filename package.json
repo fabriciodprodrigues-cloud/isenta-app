@@ -1,0 +1,17 @@
+{
+  "name": "isenta",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plataforma para gerenciar isenções de pedágio de frotas públicas",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "start": "pnpm -r start",
+    "lint": "pnpm -r lint",
+    "type-check": "pnpm -r type-check"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}

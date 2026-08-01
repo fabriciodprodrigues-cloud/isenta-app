@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply box-border;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  @apply bg-ink-900 text-paper;
+  line-height: 1.5;
+}
+
+a {
+  @apply transition-colors;
+}
+
+button {
+  @apply transition-all;
+}
+
+/* Animação da cancela */
+.barrier-arm {
+  transform-origin: 40px 100px;
+  animation: lift 3.2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barrier-arm {
+    animation: none;
+    transform: rotate(-72deg);
+  }
+}
+
+.pulse-dot {
+  animation: blink 3.2s ease-in-out infinite;
+}
