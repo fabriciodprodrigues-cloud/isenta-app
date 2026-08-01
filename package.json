@@ -9,7 +9,11 @@
     "build": "pnpm -r build",
     "start": "pnpm -r start",
     "lint": "pnpm -r lint",
-    "type-check": "pnpm -r type-check"
+    "type-check": "pnpm -r type-check",
+    "db:migrate": "cd apps/web && pnpm exec prisma migrate dev",
+    "db:seed": "cd apps/web && pnpm exec prisma db seed",
+    "db:push": "cd apps/web && pnpm exec prisma db push",
+    "db:studio": "cd apps/web && pnpm exec prisma studio"
   },
   "devDependencies": {
     "turbo": "^2.0.0"
