@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { SessionProvider } from 'next-auth/react';
 import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono } from 'next/font/google';
+import { Providers } from './providers';
 import './globals.css';
 
 const spaceGrotesk = Space_Grotesk({
@@ -48,9 +48,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="bg-ink-900 text-paper font-body antialiased">
-        <SessionProvider>
+        <Providers>
           {children}
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );

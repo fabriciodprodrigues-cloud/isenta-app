@@ -25,13 +25,51 @@ export async function GET(request: NextRequest) {
   try {
     const accounts = await prisma.account.findMany({
       include: {
-        users: true,
-        vehicles: true,
+        users: {
+          where: { role: 'operator' },
+          select: { id: true, email: true, name: true },
+        },
+        vehicles: {
+          select: { id: true },
+        },
+        concesssionaireRegistrations: {
+          select: { id: true, status: true },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(accounts);
+    const accountsWithStats = accounts.map(account => {
+      const totalCadastros = account.concesssionaireRegistrations.length;
+      const cadastrosAtivos = account.concesssionaireRegistrations.filter(r => r.status === 'aprovado').length;
+      const cadastrosPendentes = account.concesssionaireRegistrations.filter(r => r.status === 'enviado' || r.status === 'aguardando_resposta').length;
+
+      let saude = 'amarelo';
+      if (totalCadastros > 0) {
+        const taxa = cadastrosAtivos / totalCadastros;
+        if (taxa >= 0.8) saude = 'verde';
+        else if (taxa >= 0.5) saude = 'amarelo';
+        else saude = 'vermelho';
+      }
+
+      return {
+        id: account.id,
+        razaoSocial: account.razaoSocial,
+        cnpj: account.cnpj,
+        name: account.name,
+        email: account.email,
+        telefone: account.telefone,
+        city: account.city,
+        state: account.state,
+        operadores: account.users.length,
+        veiculos: account.vehicles.length,
+        cadastrosAtivos,
+        cadastrosPendentes,
+        saude,
+      };
+    });
+
+    return NextResponse.json(accountsWithStats);
   } catch (error) {
     console.error('Erro ao buscar contas:', error);
     return NextResponse.json(

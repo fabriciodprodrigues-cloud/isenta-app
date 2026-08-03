@@ -137,11 +137,11 @@ export default async function AlertsPage() {
                         }
                         size="sm"
                       >
-                        {alert.type === 'expiring_soon' &&
-                          'Vencendo em Breve'}
-                        {alert.type === 'expired' && 'Vencido'}
-                        {alert.type === 'renewal_needed' &&
-                          'Renovação Necessária'}
+                        {alert.type === 'expiring_soon'
+                          ? 'Vencendo em Breve'
+                          : alert.type === 'expired'
+                          ? 'Vencido'
+                          : 'Renovação Necessária'}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono">

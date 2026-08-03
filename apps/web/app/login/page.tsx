@@ -1,12 +1,13 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { BarrierLogo } from '@/components/BarrierLogo';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -29,7 +30,15 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    // Fetch user session to check role
+    const response = await fetch('/api/auth/session');
+    const userSession = await response.json();
+
+    if (userSession?.user?.role === 'admin') {
+      router.push('/dashboard/admin');
+    } else {
+      router.push('/dashboard');
+    }
   }
 
   return (

@@ -17,6 +17,11 @@ interface VehicleFormProps {
     type: string;
     category: string;
     status: string;
+    marca?: string;
+    modelo?: string;
+    cor?: string;
+    anoFabricacao?: number;
+    anoModelo?: number;
   };
 }
 
@@ -29,6 +34,11 @@ export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
     renavam: vehicle?.renavam || '',
     type: vehicle?.type || 'proprio',
     category: vehicle?.category || 'oficial',
+    marca: vehicle?.marca || '',
+    modelo: vehicle?.modelo || '',
+    cor: vehicle?.cor || '',
+    anoFabricacao: vehicle?.anoFabricacao?.toString() || new Date().getFullYear().toString(),
+    anoModelo: vehicle?.anoModelo?.toString() || new Date().getFullYear().toString(),
   });
 
   async function handleSubmit(e: FormEvent) {
@@ -43,8 +53,17 @@ export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
       const method = vehicle ? 'PUT' : 'POST';
 
       const payload = vehicle
-        ? formData
-        : { ...formData, accountId };
+        ? {
+            ...formData,
+            anoFabricacao: parseInt(formData.anoFabricacao),
+            anoModelo: parseInt(formData.anoModelo),
+          }
+        : {
+            ...formData,
+            accountId,
+            anoFabricacao: parseInt(formData.anoFabricacao),
+            anoModelo: parseInt(formData.anoModelo),
+          };
 
       const response = await fetch(url, {
         method,
@@ -58,9 +77,7 @@ export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
       }
 
       const saved = await response.json();
-      router.push(
-        `/dashboard/vehicles/${saved.id}`,
-      );
+      router.push(`/dashboard/vehicles/${saved.id}`);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido');
@@ -69,6 +86,9 @@ export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
     }
   }
 
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 20 }, (_, i) => currentYear - i);
+
   return (
     <Card>
       <CardHeader>
@@ -76,74 +96,146 @@ export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
           {vehicle ? 'Editar Veículo' : 'Novo Veículo'}
         </h2>
         <p className="mt-1 text-paper-dim text-sm">
-          Cadastre os dados do veículo
+          Cadastre os dados completos do veículo
         </p>
       </CardHeader>
 
       <form onSubmit={handleSubmit}>
-        <CardBody className="space-y-6">
+        <CardBody className="space-y-8">
           {error && (
             <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 text-red-300 text-sm">
               {error}
             </div>
           )}
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Input
-              label="Placa"
-              value={formData.plate}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  plate: format_plate(e.target.value.toUpperCase()),
-                })
-              }
-              placeholder="ABC-1234"
-              required
-            />
+          {/* Identificação */}
+          <div>
+            <h3 className="text-sm font-semibold text-paper mb-4">Identificação</h3>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Input
+                label="Placa"
+                value={formData.plate}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    plate: format_plate(e.target.value.toUpperCase()),
+                  })
+                }
+                placeholder="ABC-1234"
+                required
+              />
 
-            <Input
-              label="RENAVAM"
-              value={formData.renavam}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  renavam: e.target.value.replace(/\D/g, ''),
-                })
-              }
-              placeholder="00000000000"
-              required
-            />
+              <Input
+                label="RENAVAM"
+                value={formData.renavam}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    renavam: e.target.value.replace(/\D/g, ''),
+                  })
+                }
+                placeholder="00000000000"
+                required
+              />
+            </div>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Select
-              label="Tipo de Veículo"
-              value={formData.type}
-              onChange={(e) =>
-                setFormData({ ...formData, type: e.target.value })
-              }
-              options={[
-                { value: 'proprio', label: 'Próprio (12 meses)' },
-                { value: 'locado', label: 'Locado (4 meses)' },
-              ]}
-              required
-            />
+          {/* Especificações */}
+          <div>
+            <h3 className="text-sm font-semibold text-paper mb-4">Especificações do Veículo</h3>
+            <div className="grid gap-6 md:grid-cols-3">
+              <Input
+                label="Marca"
+                value={formData.marca}
+                onChange={(e) =>
+                  setFormData({ ...formData, marca: e.target.value })
+                }
+                placeholder="Toyota, Volkswagen, etc"
+                required
+              />
 
-            <Select
-              label="Categoria"
-              value={formData.category}
-              onChange={(e) =>
-                setFormData({ ...formData, category: e.target.value })
-              }
-              options={[
-                { value: 'oficial', label: 'Oficial' },
-                { value: 'ambulancia', label: 'Ambulância' },
-                { value: 'bombeiro', label: 'Bombeiro' },
-                { value: 'outro', label: 'Outro' },
-              ]}
-              required
-            />
+              <Input
+                label="Modelo"
+                value={formData.modelo}
+                onChange={(e) =>
+                  setFormData({ ...formData, modelo: e.target.value })
+                }
+                placeholder="Corolla, Gol, etc"
+                required
+              />
+
+              <Input
+                label="Cor"
+                value={formData.cor}
+                onChange={(e) =>
+                  setFormData({ ...formData, cor: e.target.value })
+                }
+                placeholder="Branco, Preto, etc"
+                required
+              />
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2 mt-6">
+              <Select
+                label="Ano de Fabricação"
+                value={formData.anoFabricacao}
+                onChange={(e) =>
+                  setFormData({ ...formData, anoFabricacao: e.target.value })
+                }
+                options={years.map((year) => ({
+                  value: year.toString(),
+                  label: year.toString(),
+                }))}
+                required
+              />
+
+              <Select
+                label="Ano Modelo"
+                value={formData.anoModelo}
+                onChange={(e) =>
+                  setFormData({ ...formData, anoModelo: e.target.value })
+                }
+                options={years.map((year) => ({
+                  value: year.toString(),
+                  label: year.toString(),
+                }))}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Classificação */}
+          <div>
+            <h3 className="text-sm font-semibold text-paper mb-4">Classificação</h3>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Select
+                label="Tipo de Veículo"
+                value={formData.type}
+                onChange={(e) =>
+                  setFormData({ ...formData, type: e.target.value })
+                }
+                options={[
+                  { value: 'proprio', label: 'Próprio (12 meses)' },
+                  { value: 'locado', label: 'Locado (4 meses)' },
+                ]}
+                required
+              />
+
+              <Select
+                label="Categoria"
+                value={formData.category}
+                onChange={(e) =>
+                  setFormData({ ...formData, category: e.target.value })
+                }
+                options={[
+                  { value: 'oficial', label: 'Oficial' },
+                  { value: 'ambulancia', label: 'Ambulância' },
+                  { value: 'bombeiro', label: 'Bombeiro' },
+                  { value: 'outro', label: 'Outro' },
+                ]}
+                required
+              />
+            </div>
           </div>
 
           <div className="rounded-lg border border-white/8 bg-ink-700/50 p-4">

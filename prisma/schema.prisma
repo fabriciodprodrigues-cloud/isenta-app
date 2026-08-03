@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -28,6 +28,7 @@ model User {
 model Account {
   id                 String   @id @default(cuid())
   name               String
+  razaoSocial        String?  // obrigatório para Motiva
   cnpj               String   @unique
   status             String   @default("pending") // pending | active | inactive
   responsibleName    String
@@ -35,7 +36,16 @@ model Account {
   responsiblePhone   String
   address            String
   city               String
-  state              String   @db.Char(2)
+  state              String
+
+  // Campos expandidos para portais (especialmente Motiva)
+  telefone           String?  // obrigatório em Motiva
+  email              String?  // obrigatório em Motiva
+  cep                String?  // obrigatório em Motiva
+  numero             String?  // obrigatório em Motiva
+  complemento        String?  // opcional em Motiva
+  bairro             String?  // obrigatório em Motiva
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -53,10 +63,17 @@ model Vehicle {
   account           Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
 
   plate             String
-  renavam           String
+  renavam           String   // obrigatório em Motiva
   type              String   // proprio | locado
   category          String   // oficial | ambulancia | bombeiro | outro
   status            String   @default("rascunho") // rascunho | enviado | aguardando | aprovado | recusado | vencido
+
+  // Campos expandidos para portais
+  cor               String?  // obrigatório em Motiva
+  marca             String?  // opcional em Motiva
+  modelo            String?  // obrigatório em Motiva
+  anoFabricacao     Int?     // obrigatório em Motiva
+  anoModelo         Int?     // obrigatório em Motiva
 
   documentUrl       String?
   contractUrl       String?  // se locado
@@ -72,6 +89,8 @@ model Vehicle {
 
   registrations ConcesssionaireRegistration[]
   alerts        Alert[]
+  documents     Document[]
+  tags          Tag[]
 
   @@unique([accountId, plate])
   @@index([accountId])
@@ -84,7 +103,9 @@ model ConcesssionaireRegistration {
   vehicleId         String
   vehicle           Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
-  concessionnaire   String   // ccr_prvias, csg_gaucha, etc
+  concessionaireId  String
+  concessionaire    Concessionaire @relation(fields: [concessionaireId], references: [id], onDelete: Restrict)
+
   status            String   @default("rascunho") // rascunho | enviado | aguardando_resposta | aprovado | recusado
   protocol          String?
 
@@ -95,8 +116,9 @@ model ConcesssionaireRegistration {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  @@unique([vehicleId, concessionnaire])
+  @@unique([vehicleId, concessionaireId])
   @@index([vehicleId])
+  @@index([concessionaireId])
   @@index([status])
 }
 
@@ -128,4 +150,76 @@ model Session {
 
   @@index([userId])
   @@index([expires])
+}
+
+model Concessionaire {
+  id                  String    @id @default(cuid())
+  name                String    @unique
+  cnpj                String?   @unique
+  grupo               String?
+  esfera              String    @default("FEDERAL")  // FEDERAL | ESTADUAL | MUNICIPAL
+  regulador           String
+  email               String?
+  phone               String?
+  website             String?
+  cidade              String?
+  estados             String?   // JSON array: ["SP","RJ"] or comma-separated
+  rodovias            String?   // JSON array or comma-separated
+  extensaoKm          Float?
+  situacao            String    @default("ATIVO")   // ATIVO | CONTRATO_ENCERRADO | EM_LEILAO | PLANEJADO
+  canalIsentos        String?
+  tipoCanal           String?   // PORTAL_WEB | EMAIL | PORTAL_MAIS_ATENDIMENTO | MANUAL
+  prazoRenovMeses     Int?
+  observacoes         String?
+  ativoParaCadastro   Boolean   @default(false)
+  camposObrigatorios  String?   // JSON array: ["placa","renavam","cor","modelo","anoFabricacao","anoModelo"]
+
+  registrations ConcesssionaireRegistration[]
+  tags          Tag[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([situacao])
+  @@index([ativoParaCadastro])
+  @@index([regulador])
+}
+
+model Tag {
+  id                String   @id @default(cuid())
+  serialNumber      String   @unique
+  vehicleId         String?
+  vehicle           Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  concessionaireId  String
+  concessionaire    Concessionaire @relation(fields: [concessionaireId], references: [id], onDelete: Restrict)
+
+  status            String   @default("available") // available | assigned | expired | inactive
+  assignedAt        DateTime?
+  expiresAt         DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([vehicleId])
+  @@index([concessionaireId])
+  @@index([status])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  type        String   // crlv | contract | registration | other
+  url         String
+  fileName    String
+  fileSize    Int
+
+  uploadedBy  String   // email do usuário que fez upload
+  uploadedAt  DateTime @default(now())
+
+  @@index([vehicleId])
+  @@index([type])
+  @@index([uploadedAt])
 }

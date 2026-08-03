@@ -31,6 +31,7 @@ export default async function VehiclesPage() {
     include: {
       account: true,
       registrations: true,
+      tags: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -43,12 +44,17 @@ export default async function VehiclesPage() {
             Veículos
           </h1>
           <p className="mt-1 text-paper-dim">
-            Gerencie a frota de veículos
+            Gerencie a frota de veículos e visualize as TAGs atribuídas
           </p>
         </div>
-        <Link href="/dashboard/vehicles/new">
-          <Button>+ Novo Veículo</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/vehicles/import">
+            <Button variant="secondary">📋 Importar em Massa</Button>
+          </Link>
+          <Link href="/dashboard/vehicles/new">
+            <Button>+ Novo Veículo</Button>
+          </Link>
+        </div>
       </div>
 
       {vehicles.length === 0 ? (
@@ -59,84 +65,102 @@ export default async function VehiclesPage() {
           </Link>
         </div>
       ) : (
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell header>Placa</TableCell>
-              <TableCell header>Tipo</TableCell>
-              <TableCell header>Status</TableCell>
-              <TableCell header>Vencimento</TableCell>
-              <TableCell header align="center">Órgão</TableCell>
-              <TableCell header align="right">Ações</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {vehicles.map((vehicle: any) => {
-              const status = get_vehicle_status(vehicle.expiresAt, vehicle.status);
-              const daysLeft = days_until_expiry(vehicle.expiresAt);
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell header>Placa</TableCell>
+                <TableCell header>Tipo</TableCell>
+                <TableCell header>Status</TableCell>
+                <TableCell header>🏷️ TAG</TableCell>
+                <TableCell header>Vencimento</TableCell>
+                <TableCell header align="center">Órgão</TableCell>
+                <TableCell header align="right">Ações</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {vehicles.map((vehicle: any) => {
+                const status = get_vehicle_status(vehicle.expiresAt, vehicle.status);
+                const daysLeft = days_until_expiry(vehicle.expiresAt);
+                const assignedTag = vehicle.tags?.[0]; // Pegue a primeira TAG atribuída
 
-              return (
-                <TableRow key={vehicle.id}>
-                  <TableCell className="font-mono font-medium">
-                    {format_plate(vehicle.plate)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="default" size="sm">
-                      {vehicle.type === 'proprio' ? 'Próprio' : 'Locado'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        vehicle.status === 'aprovado' ? 'success' :
-                        vehicle.status === 'aguardando' ? 'warning' :
-                        vehicle.status === 'recusado' ? 'error' : 'default'
-                      }
-                      size="sm"
-                    >
-                      {vehicle.status === 'rascunho' && 'Rascunho'}
-                      {vehicle.status === 'enviado' && 'Enviado'}
-                      {vehicle.status === 'aguardando' && 'Aguardando'}
-                      {vehicle.status === 'aprovado' && 'Aprovado'}
-                      {vehicle.status === 'recusado' && 'Recusado'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-sm text-paper">
-                        {format_date(vehicle.expiresAt)}
-                      </span>
-                      {vehicle.expiresAt && (
-                        <span className={`text-xs font-mono ${
-                          daysLeft < 0 ? 'text-red-400' :
-                          daysLeft <= 30 ? 'text-amber' :
-                          'text-green'
-                        }`}>
-                          {daysLeft < 0
-                            ? `${Math.abs(daysLeft)} dias vencido`
-                            : `${daysLeft} dias`
-                          }
-                        </span>
+                return (
+                  <TableRow key={vehicle.id}>
+                    <TableCell className="font-mono font-medium">
+                      {format_plate(vehicle.plate)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="default" size="sm">
+                        {vehicle.type === 'proprio' ? 'Próprio' : 'Locado'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          vehicle.status === 'aprovado' ? 'success' :
+                          vehicle.status === 'aguardando' ? 'warning' :
+                          vehicle.status === 'recusado' ? 'error' : 'default'
+                        }
+                        size="sm"
+                      >
+                        {vehicle.status === 'rascunho' && 'Rascunho'}
+                        {vehicle.status === 'enviado' && 'Enviado'}
+                        {vehicle.status === 'aguardando' && 'Aguardando'}
+                        {vehicle.status === 'aprovado' && 'Aprovado'}
+                        {vehicle.status === 'recusado' && 'Recusado'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {assignedTag ? (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-mono bg-green-500/20 text-green-300 px-2 py-1 rounded w-fit">
+                            {assignedTag.serialNumber}
+                          </span>
+                          <span className="text-xs text-paper-dim">
+                            {assignedTag.status === 'assigned' ? '✓ Atribuída' : 'Não ativa'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-paper-dim italic">Sem TAG</span>
                       )}
-                    </div>
-                  </TableCell>
-                  <TableCell align="center" className="text-sm">
-                    {vehicle.account?.name}
-                  </TableCell>
-                  <TableCell align="right">
-                    <div className="flex gap-2 justify-end">
-                      <Link href={`/dashboard/vehicles/${vehicle.id}`}>
-                        <button className="px-3 py-1 text-sm text-green hover:bg-green-dim/20 rounded transition-colors">
-                          Ver
-                        </button>
-                      </Link>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-sm text-paper">
+                          {format_date(vehicle.expiresAt)}
+                        </span>
+                        {vehicle.expiresAt && (
+                          <span className={`text-xs font-mono ${
+                            daysLeft < 0 ? 'text-red-400' :
+                            daysLeft <= 30 ? 'text-amber' :
+                            'text-green'
+                          }`}>
+                            {daysLeft < 0
+                              ? `${Math.abs(daysLeft)} dias vencido`
+                              : `${daysLeft} dias`
+                            }
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell align="center" className="text-sm">
+                      {vehicle.account?.name}
+                    </TableCell>
+                    <TableCell align="right">
+                      <div className="flex gap-2 justify-end">
+                        <Link href={`/dashboard/vehicles/${vehicle.id}`}>
+                          <button className="px-3 py-1 text-sm text-green hover:bg-green-dim/20 rounded transition-colors">
+                            Ver
+                          </button>
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );

@@ -18,7 +18,7 @@ const update_account_schema = z.object({
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: { accountId: string } },
 ) {
   const session = await auth();
 
@@ -28,7 +28,7 @@ export async function GET(
 
   try {
     const account = await prisma.account.findUnique({
-      where: { id: params.id },
+      where: { id: params.accountId },
       include: {
         users: true,
         vehicles: true,
@@ -54,11 +54,11 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: { accountId: string } },
 ) {
   const session = await auth();
 
-  if (!session || session.user?.role !== 'admin') {
+  if (!session || (session.user as any)?.role !== 'admin') {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
@@ -67,7 +67,7 @@ export async function PUT(
     const data = update_account_schema.parse(body);
 
     const account = await prisma.account.update({
-      where: { id: params.id },
+      where: { id: params.accountId },
       data,
       include: {
         users: true,
@@ -93,17 +93,17 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: { accountId: string } },
 ) {
   const session = await auth();
 
-  if (!session || session.user?.role !== 'admin') {
+  if (!session || (session.user as any)?.role !== 'admin') {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
   try {
     await prisma.account.delete({
-      where: { id: params.id },
+      where: { id: params.accountId },
     });
 
     return NextResponse.json({ success: true });

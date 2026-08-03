@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const accountId = searchParams.get('accountId');
+    const includeDocuments = searchParams.get('includeDocuments') === 'true';
 
     const query: any = {};
     if (accountId) {
@@ -30,12 +31,19 @@ export async function GET(request: NextRequest) {
       query.accountId = session.user?.accountId;
     }
 
+    const include: any = {
+      account: true,
+      registrations: true,
+      tags: true,
+    };
+
+    if (includeDocuments) {
+      include.documents = true;
+    }
+
     const vehicles = await prisma.vehicle.findMany({
       where: query,
-      include: {
-        account: true,
-        registrations: true,
-      },
+      include,
       orderBy: { createdAt: 'desc' },
     });
 

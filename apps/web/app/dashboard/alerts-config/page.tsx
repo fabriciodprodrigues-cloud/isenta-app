@@ -202,7 +202,7 @@ export default function AlertsConfigPage() {
           </p>
           <ul className="space-y-2 pl-4">
             <li>
-              1. Verificar todos os veículos com status "aprovado"
+              1. Verificar todos os veículos com status &quot;aprovado&quot;
             </li>
             <li>
               2. Calcular dias até vencimento

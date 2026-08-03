@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { CONCESSIONARIAS_COMPLETAS } from './concessionarias-completas-v2';
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,10 @@ async function main() {
 
   // Limpar dados existentes
   await prisma.alert.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.tag.deleteMany();
   await prisma.concesssionaireRegistration.deleteMany();
+  await prisma.concessionaire.deleteMany();
   await prisma.vehicle.deleteMany();
   await prisma.user.deleteMany();
   await prisma.account.deleteMany();
@@ -17,6 +21,7 @@ async function main() {
   const account = await prisma.account.create({
     data: {
       name: 'Prefeitura de São Paulo',
+      razaoSocial: 'Município de São Paulo',
       cnpj: '34.028.316/0001-08',
       status: 'active',
       responsibleName: 'João Silva',
@@ -25,6 +30,12 @@ async function main() {
       address: 'Avenida Paulista, 1000',
       city: 'São Paulo',
       state: 'SP',
+      telefone: '(11) 3231-3000',
+      email: 'isentos@prefeitura.sp.gov.br',
+      cep: '01311-100',
+      numero: '1000',
+      complemento: 'Andar 10',
+      bairro: 'Bela Vista',
     },
   });
 
@@ -66,7 +77,12 @@ async function main() {
       type: 'proprio',
       category: 'oficial',
       status: 'aprovado',
-      expiresAt: new Date(new Date().setMonth(new Date().getMonth() + 8)), // 8 meses
+      cor: 'Branco',
+      marca: 'Toyota',
+      modelo: 'Hiace',
+      anoFabricacao: 2023,
+      anoModelo: 2023,
+      expiresAt: new Date(new Date().setMonth(new Date().getMonth() + 8)),
     },
   });
 
@@ -78,7 +94,12 @@ async function main() {
       type: 'proprio',
       category: 'ambulancia',
       status: 'aprovado',
-      expiresAt: new Date(new Date().setMonth(new Date().getMonth() + 2)), // 2 meses (vencendo em breve)
+      cor: 'Branco',
+      marca: 'Mercedes-Benz',
+      modelo: 'Sprinter',
+      anoFabricacao: 2022,
+      anoModelo: 2022,
+      expiresAt: new Date(new Date().setMonth(new Date().getMonth() + 2)),
     },
   });
 
@@ -90,7 +111,12 @@ async function main() {
       type: 'locado',
       category: 'bombeiro',
       status: 'aguardando',
-      expiresAt: new Date(new Date().setMonth(new Date().getMonth() + 10)), // 10 meses
+      cor: 'Vermelho',
+      marca: 'Scania',
+      modelo: 'P 360',
+      anoFabricacao: 2021,
+      anoModelo: 2021,
+      expiresAt: new Date(new Date().setMonth(new Date().getMonth() + 10)),
     },
   });
 
@@ -102,35 +128,112 @@ async function main() {
       type: 'proprio',
       category: 'outro',
       status: 'rascunho',
+      cor: 'Preto',
+      marca: 'Volkswagen',
+      modelo: 'Delivery',
+      anoFabricacao: 2023,
+      anoModelo: 2023,
       expiresAt: null,
     },
   });
 
   console.log('✓ Vehicles created: 4');
 
-  // Criar registros de cadastro em concessionárias
-  await prisma.concesssionaireRegistration.create({
-    data: {
-      vehicleId: vehicle1.id,
-      concessionnaire: 'CCR PRVias',
-      status: 'aprovado',
-      protocol: 'CCRF-2024-001',
-      approvedAt: new Date(),
-      sentAt: new Date(new Date().setDate(new Date().getDate() - 30)),
-    },
-  });
+  // Criar todas as concessonárias (~73 registros)
+  const concessionaireMap = new Map();
+  let createdCount = 0;
+  let errorCount = 0;
 
-  await prisma.concesssionaireRegistration.create({
-    data: {
-      vehicleId: vehicle2.id,
-      concessionnaire: 'CSG',
-      status: 'aguardando_resposta',
-      protocol: 'CSG-2024-015',
-      sentAt: new Date(new Date().setDate(new Date().getDate() - 5)),
-    },
-  });
+  for (const data of CONCESSIONARIAS_COMPLETAS) {
+    try {
+      // Gerar CNPJ sequencial se não houver
+      const cnpjNumber = createdCount + 1;
+      const cnpj = `00.000.${String(cnpjNumber).padStart(3, '0')}/0001-00`;
 
-  console.log('✓ Registrations created: 2');
+      const concessionaire = await prisma.concessionaire.create({
+        data: {
+          name: data.nome,
+          grupo: data.grupo || null,
+          esfera: data.esfera,
+          regulador: data.regulador,
+          cidade: data.cidade || null,
+          estados: data.estados,
+          rodovias: data.rodovias || null,
+          extensaoKm: data.extensaoKm || null,
+          situacao: data.situacao,
+          canalIsentos: data.canalIsentos || null,
+          tipoCanal: data.tipoCanal || null,
+          prazoRenovMeses: data.prazoRenovMeses || null,
+          observacoes: data.observacoes || null,
+          ativoParaCadastro: data.ativoParaCadastro || false,
+          camposObrigatorios: data.camposObrigatorios || null,
+          cnpj: cnpj,
+        },
+      });
+
+      concessionaireMap.set(`${data.nome}`, concessionaire);
+      createdCount++;
+    } catch (error: any) {
+      errorCount++;
+      console.error(`  ✗ ${data.nome}: ${error.message}`);
+    }
+  }
+
+  console.log(`✓ Concessionaires created: ${createdCount}/${CONCESSIONARIAS_COMPLETAS.length} (erros: ${errorCount})`);
+
+  // Get demo concessionaires for registrations
+  const concessionaire1 = concessionaireMap.get('Ecovias Minas Goiás (Eco050)');
+  const concessionaire2 = concessionaireMap.get('CSG (Caminhos da Serra Gaúcha)');
+
+  if (concessionaire1 && concessionaire2) {
+    // Criar registros de cadastro em concessionárias
+    await prisma.concesssionaireRegistration.create({
+      data: {
+        vehicleId: vehicle1.id,
+        concessionaireId: concessionaire1.id,
+        status: 'aprovado',
+        protocol: 'ECO050-2024-001',
+        approvedAt: new Date(),
+        sentAt: new Date(new Date().setDate(new Date().getDate() - 30)),
+      },
+    });
+
+    await prisma.concesssionaireRegistration.create({
+      data: {
+        vehicleId: vehicle2.id,
+        concessionaireId: concessionaire2.id,
+        status: 'aguardando_resposta',
+        protocol: 'CSG-2024-015',
+        sentAt: new Date(new Date().setDate(new Date().getDate() - 5)),
+      },
+    });
+
+    console.log('✓ Registrations created: 2');
+
+    // Criar TAGs demo
+    await prisma.tag.create({
+      data: {
+        serialNumber: 'TAG-2024-001',
+        vehicleId: vehicle1.id,
+        concessionaireId: concessionaire1.id,
+        status: 'assigned',
+        assignedAt: new Date(),
+        expiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+      },
+    });
+
+    await prisma.tag.create({
+      data: {
+        serialNumber: 'TAG-2024-002',
+        concessionaireId: concessionaire2.id,
+        status: 'available',
+      },
+    });
+
+    console.log('✓ Tags created: 2');
+  } else {
+    console.log('⚠ Demo concessionaires not found - skipping registrations and tags');
+  }
 
   // Criar alertas demo
   await prisma.alert.create({

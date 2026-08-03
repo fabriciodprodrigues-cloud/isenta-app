@@ -50,6 +50,48 @@ export function Sidebar() {
             </div>
           </Link>
 
+          <div className="mt-6 mb-4">
+            <p className="px-4 text-xs font-medium uppercase tracking-wide text-slate">
+              Solicitações
+            </p>
+          </div>
+
+          <Link href="/dashboard/documentos">
+            <div
+              className={`rounded-lg px-4 py-2 transition-colors ${
+                isActive('/dashboard/documentos')
+                  ? 'bg-ink-700 text-green'
+                  : 'text-slate hover:text-paper hover:bg-ink-700/50'
+              }`}
+            >
+              Documentos
+            </div>
+          </Link>
+
+          <Link href="/dashboard/tags">
+            <div
+              className={`rounded-lg px-4 py-2 transition-colors ${
+                isActive('/dashboard/tags')
+                  ? 'bg-ink-700 text-green'
+                  : 'text-slate hover:text-paper hover:bg-ink-700/50'
+              }`}
+            >
+              TAGs
+            </div>
+          </Link>
+
+          <Link href="/dashboard/concessionarias">
+            <div
+              className={`rounded-lg px-4 py-2 transition-colors ${
+                isActive('/dashboard/concessionarias')
+                  ? 'bg-ink-700 text-green'
+                  : 'text-slate hover:text-paper hover:bg-ink-700/50'
+              }`}
+            >
+              Concessionárias
+            </div>
+          </Link>
+
           {session?.user?.role === 'admin' && (
             <Link href="/dashboard/alerts-config">
               <div
@@ -84,24 +126,6 @@ export function Sidebar() {
           </div>
         </Link>
 
-        <div className="mt-6 mb-4">
-          <p className="px-4 text-xs font-medium uppercase tracking-wide text-slate">
-            Gerenciamento
-          </p>
-        </div>
-
-        <Link href="/dashboard/accounts">
-          <div
-            className={`rounded-lg px-4 py-2 transition-colors ${
-              isActive('/dashboard/accounts')
-                ? 'bg-ink-700 text-green'
-                : 'text-slate hover:text-paper hover:bg-ink-700/50'
-            }`}
-          >
-            Órgãos Públicos
-          </div>
-        </Link>
-
         <Link href="/dashboard/vehicles">
           <div
             className={`rounded-lg px-4 py-2 transition-colors ${
@@ -123,6 +147,48 @@ export function Sidebar() {
             }`}
           >
             Alertas
+          </div>
+        </Link>
+
+        <div className="mt-6 mb-4">
+          <p className="px-4 text-xs font-medium uppercase tracking-wide text-slate">
+            Solicitações
+          </p>
+        </div>
+
+        <Link href="/dashboard/documentos">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors ${
+              isActive('/dashboard/documentos')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            Documentos
+          </div>
+        </Link>
+
+        <Link href="/dashboard/tags">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors ${
+              isActive('/dashboard/tags')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            TAGs
+          </div>
+        </Link>
+
+        <Link href="/dashboard/concessionarias">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors ${
+              isActive('/dashboard/concessionarias')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            Concessionárias
           </div>
         </Link>
       </nav>
