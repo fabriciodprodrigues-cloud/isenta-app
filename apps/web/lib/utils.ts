@@ -136,3 +136,15 @@ export function get_status_color(status: string): string {
   };
   return colors[status] || 'bg-slate/20 text-slate';
 }
+
+export function get_status_label(status: string): string {
+  const labels: Record<string, string> = {
+    rascunho: 'Rascunho',
+    enviado: 'Enviado',
+    aguardando: 'Aguardando',
+    aprovado: 'Aprovado',
+    recusado: 'Recusado',
+    vencido: 'Vencido',
+  };
+  return labels[status] || status;
+}

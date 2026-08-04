@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { validate_cnpj } from '@/lib/utils';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 const create_account_schema = z.object({
   name: z.string().min(3, 'Nome deve ter ao menos 3 caracteres'),
   cnpj: z.string().refine(validate_cnpj, 'CNPJ inválido'),
@@ -30,19 +33,25 @@ export async function GET(request: NextRequest) {
           select: { id: true, email: true, name: true },
         },
         vehicles: {
-          select: { id: true },
-        },
-        concesssionaireRegistrations: {
-          select: { id: true, status: true },
+          select: {
+            id: true,
+            registrations: {
+              select: { id: true, status: true },
+            },
+          },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
     const accountsWithStats = accounts.map(account => {
-      const totalCadastros = account.concesssionaireRegistrations.length;
-      const cadastrosAtivos = account.concesssionaireRegistrations.filter(r => r.status === 'aprovado').length;
-      const cadastrosPendentes = account.concesssionaireRegistrations.filter(r => r.status === 'enviado' || r.status === 'aguardando_resposta').length;
+      // Cadastros pendem de Vehicle, nao de Account: a conta so os alcanca
+      // atravessando seus veiculos.
+      const registrations = account.vehicles.flatMap(v => v.registrations);
+
+      const totalCadastros = registrations.length;
+      const cadastrosAtivos = registrations.filter(r => r.status === 'aprovado').length;
+      const cadastrosPendentes = registrations.filter(r => r.status === 'enviado' || r.status === 'aguardando_resposta').length;
 
       let saude = 'amarelo';
       if (totalCadastros > 0) {

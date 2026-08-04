@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   request: Request,
   { params }: { params: { accountId: string } }
@@ -27,14 +30,11 @@ export async function GET(
       where: { vehicle: { accountId: params.accountId } },
     });
 
-    const tags = await prisma.tag.findMany({
-      where: {
-        concessionaire: {
-          tags: {
-            some: { vehicle: { accountId: params.accountId } }
-          }
-        }
-      },
+    // TAGs sao universais (aceitas em qualquer concessionaria) e so ganham
+    // vinculo com uma conta quando atribuidas a um veiculo. Logo "disponiveis"
+    // e o estoque global ainda nao atribuido, nao um subconjunto da conta.
+    const availableTags = await prisma.tag.count({
+      where: { status: 'available', vehicleId: null },
     });
 
     // Calcular dados
@@ -50,8 +50,6 @@ export async function GET(
     const pendingDocuments = documents.filter(
       d => new Date(d.uploadedAt).getMonth() === new Date().getMonth()
     ).length;
-
-    const availableTags = tags.filter(t => t.status === 'available').length;
 
     return NextResponse.json({
       totalVehicles,

@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth';
 import { processPendingRegistrations } from '@/lib/registration-orchestrator';
 import { NextResponse } from 'next/server';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const session = await auth();

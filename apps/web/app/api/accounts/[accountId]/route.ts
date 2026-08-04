@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { validate_cnpj } from '@/lib/utils';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 const update_account_schema = z.object({
   name: z.string().min(3).optional(),
   cnpj: z.string().refine(validate_cnpj, 'CNPJ inválido').optional(),

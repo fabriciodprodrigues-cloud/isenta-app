@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth';
 import { getQueueStats, getFailedJobs } from '@/lib/queue-service';
 import { NextResponse } from 'next/server';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const session = await auth();

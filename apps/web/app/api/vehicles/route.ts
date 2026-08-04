@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { validate_plate, validate_renavam, calculate_expiry_date } from '@/lib/utils';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 const create_vehicle_schema = z.object({
   accountId: z.string().min(1),
   plate: z.string().refine(validate_plate, 'Placa inválida'),

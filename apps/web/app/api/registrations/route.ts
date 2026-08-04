@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     const session = await auth();
@@ -42,8 +45,8 @@ export async function GET(request: Request) {
             email: true,
             phone: true,
             website: true,
-            city: true,
-            state: true,
+            cidade: true,
+            estados: true,
           },
         },
       },

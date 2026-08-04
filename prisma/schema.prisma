@@ -175,7 +175,6 @@ model Concessionaire {
   camposObrigatorios  String?   // JSON array: ["placa","renavam","cor","modelo","anoFabricacao","anoModelo"]
 
   registrations ConcesssionaireRegistration[]
-  tags          Tag[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -191,8 +190,7 @@ model Tag {
   vehicleId         String?
   vehicle           Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
-  concessionaireId  String
-  concessionaire    Concessionaire @relation(fields: [concessionaireId], references: [id], onDelete: Restrict)
+  // Sem vinculo com concessionaria: a TAG e aceita em todas elas.
 
   status            String   @default("available") // available | assigned | expired | inactive
   assignedAt        DateTime?
@@ -202,7 +200,6 @@ model Tag {
   updatedAt         DateTime @updatedAt
 
   @@index([vehicleId])
-  @@index([concessionaireId])
   @@index([status])
 }
 

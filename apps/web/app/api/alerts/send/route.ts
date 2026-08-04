@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma';
 import { generate_alert_email } from '@/lib/email-templates';
 import { days_until_expiry } from '@/lib/utils';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 const ALERT_THRESHOLDS = [60, 30, 7];
 
 export async function POST(request: NextRequest) {

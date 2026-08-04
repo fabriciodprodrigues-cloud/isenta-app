@@ -92,19 +92,6 @@ export function Sidebar() {
             </div>
           </Link>
 
-          {session?.user?.role === 'admin' && (
-            <Link href="/dashboard/alerts-config">
-              <div
-                className={`rounded-lg px-4 py-2 transition-colors text-sm ${
-                  isActive('/dashboard/alerts-config')
-                    ? 'bg-ink-700 text-green'
-                    : 'text-slate hover:text-paper hover:bg-ink-700/50'
-                }`}
-              >
-                └─ Configuração
-              </div>
-            </Link>
-          )}
         </nav>
       </aside>
     );
@@ -141,12 +128,24 @@ export function Sidebar() {
         <Link href="/dashboard/alerts">
           <div
             className={`rounded-lg px-4 py-2 transition-colors ${
-              isActive('/dashboard/alerts')
+              isActive('/dashboard/alerts') && !isActive('/dashboard/alerts-config')
                 ? 'bg-ink-700 text-green'
                 : 'text-slate hover:text-paper hover:bg-ink-700/50'
             }`}
           >
             Alertas
+          </div>
+        </Link>
+
+        <Link href="/dashboard/alerts-config">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors text-sm ${
+              isActive('/dashboard/alerts-config')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            └─ Configuração
           </div>
         </Link>
 

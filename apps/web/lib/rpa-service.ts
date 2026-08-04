@@ -102,7 +102,7 @@ async function handleCSGPortal(page: Page, context: RPAContext): Promise<boolean
       'button:has-text("Solicitar"), button:has-text("Cadastro"), button:has-text("Enviar")'
     ).first();
 
-    if (!submitButton.isVisible()) {
+    if (!(await submitButton.isVisible())) {
       console.warn('[RPA] ⚠️ Botão de submissão não encontrado no CSG');
       return false;
     }
@@ -112,7 +112,7 @@ async function handleCSGPortal(page: Page, context: RPAContext): Promise<boolean
       'input[placeholder*="placa"], input[name*="plate"], input[id*="plate"]'
     ).first();
 
-    if (vehiclePlateField.isVisible()) {
+    if (await vehiclePlateField.isVisible()) {
       await vehiclePlateField.fill(context.vehiclePlate);
       console.log(`[RPA] 📝 Placa preenchida: ${context.vehiclePlate}`);
     }
@@ -140,7 +140,7 @@ async function handleCSGPortal(page: Page, context: RPAContext): Promise<boolean
       'text=/sucesso|confirmado|recebido/i'
     ).first();
 
-    const success = successMessage.isVisible();
+    const success = await successMessage.isVisible();
     console.log(`[RPA] ${success ? '✅' : '❌'} CSG: ${success ? 'Sucesso' : 'Falha'}`);
 
     return success;
@@ -159,7 +159,7 @@ async function handleMotivaPortal(page: Page, context: RPAContext): Promise<bool
       'input[type="email"], input[name*="login"], input[id*="user"]'
     ).first();
 
-    if (loginField.isVisible()) {
+    if (await loginField.isVisible()) {
       // Usar CNPJ como login (padrão CCR/Motiva)
       await loginField.fill(context.cnpj);
       console.log(`[RPA] 🔐 Login preenchido com CNPJ`);
@@ -169,7 +169,7 @@ async function handleMotivaPortal(page: Page, context: RPAContext): Promise<bool
         'input[type="password"], input[name*="password"]'
       ).first();
 
-      if (passwordField.isVisible()) {
+      if (await passwordField.isVisible()) {
         // Usar valor padrão ou variável de ambiente
         const defaultPassword = process.env.MOTIVA_DEFAULT_PASSWORD || '12345678';
         await passwordField.fill(defaultPassword);
@@ -181,7 +181,7 @@ async function handleMotivaPortal(page: Page, context: RPAContext): Promise<bool
         'button:has-text("Login"), button:has-text("Entrar")'
       ).first();
 
-      if (loginButton.isVisible()) {
+      if (await loginButton.isVisible()) {
         await loginButton.click();
         await page.waitForNavigation({ waitUntil: 'networkidle' });
       }
@@ -199,7 +199,7 @@ async function handleMotivaPortal(page: Page, context: RPAContext): Promise<bool
       'button:has-text("Novo"), button:has-text("Adicionar"), button:has-text("Registrar")'
     ).first();
 
-    if (newRegistrationButton.isVisible()) {
+    if (await newRegistrationButton.isVisible()) {
       await newRegistrationButton.click();
       await page.waitForTimeout(1000);
     }
@@ -226,7 +226,7 @@ async function handleMotivaPortal(page: Page, context: RPAContext): Promise<bool
       'button:has-text("Enviar"), button:has-text("Solicitar"), button:has-text("Confirmar")'
     ).first();
 
-    if (submitButton.isVisible()) {
+    if (await submitButton.isVisible()) {
       await submitButton.click();
       await page.waitForTimeout(2000);
     }
@@ -243,7 +243,7 @@ async function handleMotivaPortal(page: Page, context: RPAContext): Promise<bool
       'text=/sucesso|confirmado|aprovado|registrado/i'
     ).first();
 
-    const success = successMessage.isVisible();
+    const success = await successMessage.isVisible();
     console.log(`[RPA] ${success ? '✅' : '❌'} Motiva: ${success ? 'Sucesso' : 'Falha'}`);
 
     return success;

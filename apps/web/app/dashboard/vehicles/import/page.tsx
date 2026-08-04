@@ -195,8 +195,8 @@ export default function ImportVehiclesPage() {
             <div className="rounded-lg border border-white/8 bg-ink-700/50 p-4">
               <h3 className="font-semibold text-paper mb-3">Colunas Opcionais:</h3>
               <ul className="text-sm text-slate space-y-1 list-disc list-inside">
-                <li>type: "proprio" ou "locado" (padrão: "proprio")</li>
-                <li>category: "oficial", "ambulancia", "bombeiro", "outro" (padrão: "oficial")</li>
+                <li>type: &quot;proprio&quot; ou &quot;locado&quot; (padrão: &quot;proprio&quot;)</li>
+                <li>category: &quot;oficial&quot;, &quot;ambulancia&quot;, &quot;bombeiro&quot;, &quot;outro&quot; (padrão: &quot;oficial&quot;)</li>
               </ul>
             </div>
 

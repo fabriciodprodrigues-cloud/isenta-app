@@ -79,7 +79,7 @@ export default function GestaoTags() {
 
       if (response.ok) {
         await loadData();
-        setFormData({ serialNumber: '', concessionaireId: '', vehicleId: '', expiresAt: '' });
+        setFormData({ serialNumber: '', vehicleId: '', expiresAt: '' });
         setShowForm(false);
       } else {
         alert('Erro ao criar TAG');
@@ -232,13 +232,7 @@ export default function GestaoTags() {
                       {tag.serialNumber}
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        className={
-                          tag.status === 'available'
-                            ? 'bg-green-500/20 text-green-300'
-                            : 'bg-blue-500/20 text-blue-300'
-                        }
-                      >
+                      <Badge variant={tag.status === 'available' ? 'success' : 'info'}>
                         {tag.status === 'available' ? '✓ Disponível' : '→ Vinculada'}
                       </Badge>
                     </TableCell>

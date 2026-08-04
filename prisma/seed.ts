@@ -215,7 +215,6 @@ async function main() {
       data: {
         serialNumber: 'TAG-2024-001',
         vehicleId: vehicle1.id,
-        concessionaireId: concessionaire1.id,
         status: 'assigned',
         assignedAt: new Date(),
         expiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
@@ -225,7 +224,6 @@ async function main() {
     await prisma.tag.create({
       data: {
         serialNumber: 'TAG-2024-002',
-        concessionaireId: concessionaire2.id,
         status: 'available',
       },
     });

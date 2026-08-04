@@ -11,7 +11,7 @@ import {
   TableCell,
 } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
-import { format_plate, format_date, days_until_expiry, get_vehicle_status } from '@/lib/utils';
+import { format_plate, format_date, days_until_expiry, get_vehicle_status, get_status_label } from '@/lib/utils';
 
 export default async function VehiclesPage() {
   const session = await auth();
@@ -103,11 +103,7 @@ export default async function VehiclesPage() {
                         }
                         size="sm"
                       >
-                        {vehicle.status === 'rascunho' && 'Rascunho'}
-                        {vehicle.status === 'enviado' && 'Enviado'}
-                        {vehicle.status === 'aguardando' && 'Aguardando'}
-                        {vehicle.status === 'aprovado' && 'Aprovado'}
-                        {vehicle.status === 'recusado' && 'Recusado'}
+                        {get_status_label(vehicle.status)}
                       </Badge>
                     </TableCell>
                     <TableCell>

@@ -29,8 +29,10 @@ interface Registration {
     email: string;
     phone: string;
     website?: string;
-    city: string;
-    state: string;
+    // Nomes vindos do model Concessionaire; estados e uma lista (ex.: "SP,RJ").
+    // Ambos sao opcionais no schema.
+    cidade: string | null;
+    estados: string | null;
   };
   vehicle: {
     plate: string;
@@ -269,7 +271,7 @@ export default function ConcessionariasPage() {
                 >
                   <h3 className="font-semibold text-paper mb-2">{con.name}</h3>
                   <div className="space-y-1 text-sm text-paper-dim">
-                    <p>📍 {con.city}, {con.state}</p>
+                    <p>📍 {[con.cidade, con.estados].filter(Boolean).join(', ') || '—'}</p>
                     <p>📱 {con.phone}</p>
                     <p>📧 {con.email}</p>
                     {con.website && (

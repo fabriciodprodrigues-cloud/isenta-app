@@ -31,7 +31,12 @@ interface AccountData {
 }
 
 // Mapeamento de campos obrigatórios por concessionaire
-const REQUIRED_FIELDS_MAP: Record<string, Record<string, string[]>> = {
+type RequiredFields = {
+  vehicle: string[];
+  account: string[];
+};
+
+const REQUIRED_FIELDS_MAP: Record<string, RequiredFields> = {
   // Motiva Paraná - requer campos completos
   'Motiva Paraná (ex-PRVias)': {
     vehicle: [
@@ -220,10 +225,7 @@ function validateFields(
 
 export async function getRequiredFieldsForConcessionaire(
   concessionaireId: string
-): Promise<{
-  vehicle: string[];
-  account: string[];
-} | null> {
+): Promise<RequiredFields | null> {
   try {
     const concessionaire = await prisma.concessionaire.findUnique({
       where: { id: concessionaireId },

@@ -26,11 +26,14 @@ interface Tag {
   expiresAt: string | null;
 }
 
-const statusBadge = {
-  available: { label: '✓ Disponível', color: 'bg-green-500/20 text-green-300' },
-  assigned: { label: '→ Atribuída', color: 'bg-blue-500/20 text-blue-300' },
-  expired: { label: '✗ Expirada', color: 'bg-red-500/20 text-red-300' },
-  inactive: { label: '○ Inativa', color: 'bg-gray-500/20 text-gray-300' },
+const statusBadge: Record<
+  string,
+  { label: string; variant: 'success' | 'info' | 'error' | 'default' }
+> = {
+  available: { label: '✓ Disponível', variant: 'success' },
+  assigned: { label: '→ Atribuída', variant: 'info' },
+  expired: { label: '✗ Expirada', variant: 'error' },
+  inactive: { label: '○ Inativa', variant: 'default' },
 };
 
 export default function TagsPage() {
@@ -169,12 +172,8 @@ export default function TagsPage() {
                         {tag.serialNumber}
                       </TableCell>
                       <TableCell>
-                        <Badge
-                          className={
-                            statusBadge[tag.status as keyof typeof statusBadge]?.color
-                          }
-                        >
-                          {statusBadge[tag.status as keyof typeof statusBadge]?.label}
+                        <Badge variant={statusBadge[tag.status]?.variant ?? 'default'}>
+                          {statusBadge[tag.status]?.label ?? tag.status}
                         </Badge>
                       </TableCell>
                       <TableCell>

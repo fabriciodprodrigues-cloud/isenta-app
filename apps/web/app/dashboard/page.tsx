@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/Table';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { format_plate, format_date, days_until_expiry } from '@/lib/utils';
+import { format_plate, format_date, days_until_expiry, get_status_label } from '@/lib/utils';
 
 interface Vehicle {
   id: string;
@@ -257,11 +257,7 @@ export default function DashboardPage() {
                                   : 'default'
                           }
                         >
-                          {vehicle.status === 'rascunho' && 'Rascunho'}
-                          {vehicle.status === 'enviado' && 'Enviado'}
-                          {vehicle.status === 'aguardando' && 'Aguardando'}
-                          {vehicle.status === 'aprovado' && 'Aprovado'}
-                          {vehicle.status === 'recusado' && 'Recusado'}
+                          {get_status_label(vehicle.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm">

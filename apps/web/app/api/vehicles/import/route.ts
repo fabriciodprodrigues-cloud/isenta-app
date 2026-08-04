@@ -2,6 +2,9 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
+// Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -52,9 +55,16 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Verificar se já existe veículo com esta placa
+        // Verificar se já existe veículo com esta placa nesta conta.
+        // A placa so e unica dentro da conta (@@unique([accountId, plate])):
+        // orgaos diferentes podem cadastrar a mesma placa.
         const existing = await prisma.vehicle.findUnique({
-          where: { plate: vehicle.placa.toUpperCase() },
+          where: {
+            accountId_plate: {
+              accountId,
+              plate: vehicle.placa.toUpperCase(),
+            },
+          },
         });
 
         if (existing) {
