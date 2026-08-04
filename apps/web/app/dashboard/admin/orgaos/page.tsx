@@ -8,11 +8,13 @@ import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/u
 
 interface Account {
   id: string;
-  razaoSocial: string;
+  // razaoSocial, email e telefone sao opcionais no schema (String?), entao a
+  // API pode devolver null em contas antigas ou importadas.
+  razaoSocial: string | null;
   cnpj: string;
   name: string;
-  email: string;
-  telefone: string;
+  email: string | null;
+  telefone: string | null;
   city: string;
   state: string;
   operadores: number;
@@ -47,7 +49,11 @@ export default function GestaoOrgaos() {
   }
 
   const orgaosFiltrados = orgaos.filter(o => {
-    const matchNome = o.razaoSocial.toLowerCase().includes(filtro.toLowerCase()) || o.cnpj.includes(filtro);
+    const busca = filtro.toLowerCase();
+    const matchNome =
+      (o.razaoSocial ?? '').toLowerCase().includes(busca) ||
+      (o.name ?? '').toLowerCase().includes(busca) ||
+      o.cnpj.includes(filtro);
     const matchEstado = !filtroEstado || o.state === filtroEstado;
     const matchSaude = !filtroSaude || o.saude === filtroSaude;
     return matchNome && matchEstado && matchSaude;
@@ -150,7 +156,7 @@ export default function GestaoOrgaos() {
                   {orgaosFiltrados.map((orgao) => (
                     <TableRow key={orgao.id}>
                       <TableCell className="font-medium">
-                        {orgao.razaoSocial}
+                        {orgao.razaoSocial ?? orgao.name}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
                         {orgao.cnpj}

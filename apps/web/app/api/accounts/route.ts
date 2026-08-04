@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
 
 const create_account_schema = z.object({
   name: z.string().min(3, 'Nome deve ter ao menos 3 caracteres'),
+  // O formulario envia razaoSocial e a coluna existe no schema. Sem declarar
+  // aqui, o Zod descartava o campo silenciosamente e a conta era gravada com
+  // razaoSocial null — que por sua vez quebrava a listagem de orgaos.
+  razaoSocial: z.string().min(3, 'Razão social deve ter ao menos 3 caracteres'),
   cnpj: z.string().refine(validate_cnpj, 'CNPJ inválido'),
   responsibleName: z.string().min(3),
   responsibleEmail: z.string().email(),
