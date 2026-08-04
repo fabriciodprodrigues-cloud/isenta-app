@@ -112,11 +112,6 @@ export default async function AccountsPage() {
                         Editar
                       </button>
                     </Link>
-                    <Link href={`/dashboard/accounts/${account.id}/users`}>
-                      <button className="px-3 py-1 text-sm text-slate hover:bg-ink-700 rounded transition-colors">
-                        Usuários
-                      </button>
-                    </Link>
                   </div>
                 </TableCell>
               </TableRow>

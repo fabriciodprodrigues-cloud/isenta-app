@@ -142,9 +142,22 @@ export function get_status_label(status: string): string {
     rascunho: 'Rascunho',
     enviado: 'Enviado',
     aguardando: 'Aguardando',
+    // Cadastros em concessionária usam este valor onde o veículo usa
+    // 'aguardando'; ambos aparecem na mesma tela de detalhe.
+    aguardando_resposta: 'Aguardando',
     aprovado: 'Aprovado',
     recusado: 'Recusado',
     vencido: 'Vencido',
   };
   return labels[status] || status;
+}
+
+export function get_category_label(category: string): string {
+  const labels: Record<string, string> = {
+    oficial: 'Oficial',
+    ambulancia: 'Ambulância',
+    bombeiro: 'Bombeiro',
+    outro: 'Outro',
+  };
+  return labels[category] || category;
 }
