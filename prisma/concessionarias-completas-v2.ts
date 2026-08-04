@@ -15,7 +15,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -28,7 +28,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -41,7 +41,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -54,7 +54,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -69,7 +69,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Trecho Goiânia-Brasília; será relicitado como Rota do Pequi (leilão ago/2026)",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -85,7 +85,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "CONTRATO_ENCERRADO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -100,7 +100,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "isentos@eco050.com.br",
     tipoCanal: "EMAIL",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa", "renavam"]),
   },
   {
@@ -113,7 +113,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -126,7 +126,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -139,7 +139,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -152,7 +152,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "CONTRATO_ENCERRADO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -165,7 +165,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "isentos.araguaia@ecovias.com.br",
     tipoCanal: "EMAIL",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa", "renavam"]),
   },
   {
@@ -178,7 +178,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -193,7 +193,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -206,7 +206,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -219,7 +219,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -232,7 +232,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -245,7 +245,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -258,7 +258,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -273,7 +273,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "https://www.eprltorais.com.br/isentos",
     tipoCanal: "PORTAL_MAIS_ATENDIMENTO",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Formulário no site + WhatsApp",
     camposObrigatorios: JSON.stringify(["placa", "renavam"]),
   },
@@ -287,7 +287,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "https://www.viaaraucaria.com.br/isentos",
     tipoCanal: "PORTAL_MAIS_ATENDIMENTO",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Formulário no site + WhatsApp",
     camposObrigatorios: JSON.stringify(["placa", "renavam"]),
   },
@@ -301,7 +301,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "CONTRATO_ENCERRADO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -314,7 +314,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -329,7 +329,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "https://isentos.motivapagamentos.com.br",
     tipoCanal: "PORTAL_WEB",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Portal com RPA Playwright",
     camposObrigatorios: JSON.stringify([
       "placa",
@@ -350,7 +350,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -363,7 +363,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -378,7 +378,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -391,7 +391,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -406,7 +406,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "isento@way262.com.br",
     tipoCanal: "EMAIL",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa", "renavam"]),
   },
   {
@@ -420,7 +420,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Cobrança a partir de 2026. Rota crítica Goiânia-Brasília.",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -434,7 +434,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -447,7 +447,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -460,7 +460,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "CONTRATO_ENCERRADO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -473,7 +473,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "CONTRATO_ENCERRADO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Assumida pelo DNIT; trecho Brasília-Cristalina em renegociação",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -487,7 +487,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "CONTRATO_ENCERRADO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Caducidade declarada",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -501,7 +501,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -514,7 +514,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -527,7 +527,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -540,7 +540,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -553,7 +553,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -568,7 +568,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -580,7 +580,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -592,7 +592,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -604,7 +604,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -616,7 +616,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -628,7 +628,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -640,7 +640,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -652,7 +652,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -664,7 +664,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -676,7 +676,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -688,7 +688,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -700,7 +700,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -712,7 +712,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -724,7 +724,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -736,7 +736,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -748,7 +748,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -760,7 +760,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -772,7 +772,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -784,7 +784,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -796,7 +796,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -808,7 +808,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -820,7 +820,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -838,7 +838,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -852,7 +852,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -868,7 +868,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -882,7 +882,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -896,7 +896,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Leiloado out/2025",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -911,7 +911,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Nome da concessionária a confirmar na Sinfra-MT",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -926,7 +926,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Nome da concessionária a confirmar na Sinfra-MT",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -942,7 +942,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     observacoes: "Pedágio público estadual, não concessionária privada. ~10-14 praças.",
     camposObrigatorios: JSON.stringify(["placa"]),
   },
@@ -956,7 +956,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: "isentos@csg.com.br",
     tipoCanal: "EMAIL",
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa", "renavam"]),
   },
   {
@@ -970,7 +970,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 
@@ -987,7 +987,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
   {
@@ -1000,7 +1000,7 @@ export const CONCESSIONARIAS_COMPLETAS = [
     situacao: "ATIVO",
     canalIsentos: null,
     tipoCanal: null,
-    ativoParaCadastro: false,
+    ativoParaCadastro: true,
     camposObrigatorios: JSON.stringify(["placa"]),
   },
 ];

@@ -13,7 +13,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Listar todas as concessionárias (públicas para todos os usuários)
+    // ?aptas=true devolve apenas as habilitadas para receber solicitação de
+    // isenção. O diretório da tela de Concessionárias usa a lista completa;
+    // o modal de Solicitar Isenção usa a filtrada.
+    const apenasAptas =
+      new URL(request.url).searchParams.get('aptas') === 'true';
+
     const concessionaires = await prisma.concessionaire.findMany({
       select: {
         id: true,
@@ -40,6 +45,7 @@ export async function GET(request: Request) {
       ],
       where: {
         situacao: 'ATIVO',
+        ...(apenasAptas ? { ativoParaCadastro: true } : {}),
       },
     });
 

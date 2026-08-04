@@ -38,6 +38,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
+    // A concessionária precisa estar habilitada. Esta é a checagem que vale:
+    // o filtro do modal é conveniência de interface e não impede uma chamada
+    // direta à API.
+    const concessionaire = await prisma.concessionaire.findUnique({
+      where: { id: concessionaireId },
+      select: { name: true, situacao: true, ativoParaCadastro: true },
+    });
+
+    if (!concessionaire) {
+      return NextResponse.json(
+        { error: 'Concessionária não encontrada' },
+        { status: 404 }
+      );
+    }
+
+    if (concessionaire.situacao !== 'ATIVO' || !concessionaire.ativoParaCadastro) {
+      return NextResponse.json(
+        {
+          error: `${concessionaire.name} não está habilitada para receber solicitações de isenção`,
+        },
+        { status: 400 }
+      );
+    }
+
     // Verificar se já existe registração
     const existingRegistration = await prisma.concesssionaireRegistration.findFirst({
       where: {

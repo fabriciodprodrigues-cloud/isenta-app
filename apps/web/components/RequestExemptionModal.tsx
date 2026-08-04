@@ -17,7 +17,16 @@ interface Concessionaire {
   regulador?: string;
   situacao?: string;
   ativoParaCadastro?: boolean;
+  canalIsentos?: string | null;
+  tipoCanal?: string | null;
 }
+
+const CANAL_LABELS: Record<string, string> = {
+  EMAIL: 'e-mail',
+  PORTAL_WEB: 'portal web',
+  PORTAL_MAIS_ATENDIMENTO: 'portal +Atendimento',
+  MANUAL: 'manual',
+};
 
 interface RequestExemptionModalProps {
   vehicles: Vehicle[];
@@ -38,25 +47,28 @@ export function RequestExemptionModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Agrupar concessionárias por estado
+  // Agrupar concessionárias por estado. Só entram as habilitadas — a API de
+  // criação rejeita as demais, então lista-las aqui só geraria falha.
   const stateGroups = useMemo(() => {
     const groups: Record<string, Concessionaire[]> = {};
-    concessionaires.forEach(c => {
-      try {
-        // Parse estados array from JSON string
-        const estados = c.estados ? JSON.parse(c.estados) : [];
-        if (Array.isArray(estados)) {
-          estados.forEach(estado => {
-            if (!groups[estado]) {
-              groups[estado] = [];
-            }
-            groups[estado].push(c);
-          });
+    concessionaires
+      .filter(c => c.ativoParaCadastro !== false)
+      .forEach(c => {
+        try {
+          // Parse estados array from JSON string
+          const estados = c.estados ? JSON.parse(c.estados) : [];
+          if (Array.isArray(estados)) {
+            estados.forEach(estado => {
+              if (!groups[estado]) {
+                groups[estado] = [];
+              }
+              groups[estado].push(c);
+            });
+          }
+        } catch (e) {
+          console.error(`Error parsing estados for concessionaire ${c.id}:`, e);
         }
-      } catch (e) {
-        console.error(`Error parsing estados for concessionaire ${c.id}:`, e);
-      }
-    });
+      });
     return groups;
   }, [concessionaires]);
 
@@ -102,7 +114,7 @@ export function RequestExemptionModal({
 
     try {
       let successCount = 0;
-      let errorCount = 0;
+      const motivos = new Set<string>();
 
       for (const vehicleId of selectedVehicles) {
         for (const concessionaireId of selectedConcessionaires) {
@@ -119,16 +131,24 @@ export function RequestExemptionModal({
             if (response.ok) {
               successCount++;
             } else {
-              errorCount++;
+              // Sem isto o usuário via apenas "N falharam" e não tinha como
+              // saber se foi duplicidade, concessionária inapta ou permissão.
+              const corpo = await response.json().catch(() => null);
+              motivos.add(corpo?.error ?? `Erro ${response.status}`);
             }
           } catch (err) {
-            errorCount++;
+            motivos.add('Falha de conexão');
           }
         }
       }
 
-      if (errorCount > 0) {
-        setError(`${successCount} solicitações criadas, ${errorCount} falharam`);
+      if (motivos.size > 0) {
+        const lista = Array.from(motivos).join('; ');
+        setError(
+          successCount > 0
+            ? `${successCount} solicitações criadas. Não foi possível criar as demais: ${lista}`
+            : `Nenhuma solicitação criada: ${lista}`
+        );
       } else {
         onSuccess();
         onClose();
@@ -202,14 +222,25 @@ export function RequestExemptionModal({
                   </p>
                 ) : (
                   concessionairesInState.map((c) => (
-                    <label key={c.id} className="flex items-center gap-3 cursor-pointer">
+                    <label key={c.id} className="flex items-start gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={selectedConcessionaires.includes(c.id)}
                         onChange={() => toggleConcessionaire(c.id)}
-                        className="w-4 h-4 rounded accent-green"
+                        className="w-4 h-4 rounded accent-green mt-0.5"
                       />
-                      <span className="text-paper text-sm">{c.name}</span>
+                      <span className="text-paper text-sm">
+                        {c.name}
+                        {c.canalIsentos ? (
+                          <span className="block text-xs text-green">
+                            canal por {CANAL_LABELS[c.tipoCanal ?? ''] ?? 'canal direto'}
+                          </span>
+                        ) : (
+                          <span className="block text-xs text-slate">
+                            sem canal cadastrado — exigirá tratativa manual
+                          </span>
+                        )}
+                      </span>
                     </label>
                   ))
                 )}
