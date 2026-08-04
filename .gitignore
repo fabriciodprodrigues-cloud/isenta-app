@@ -7,7 +7,6 @@ node_modules/
 dist/
 build/
 *.log
-pnpm-lock.yaml
 .turbo/
 .cache/
 .vscode/
@@ -15,5 +14,9 @@ pnpm-lock.yaml
 *.swp
 *.swo
 coverage/
-.env.example
 tmp/
+
+# Bancos SQLite locais (o projeto usa PostgreSQL)
+*.db
+*.db-journal
+*.sqlite
