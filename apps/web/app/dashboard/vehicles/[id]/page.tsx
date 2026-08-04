@@ -30,6 +30,11 @@ export default async function VehicleDetailsPage({
       account: true,
       registrations: true,
       alerts: true,
+      // A fonte de verdade do vinculo com a TAG e a relacao Tag.vehicleId, que
+      // e o que PUT /api/tags grava. O campo Vehicle.tagSerialNumber existe no
+      // schema mas nenhuma rota o escreve, entao ler dele mostrava sempre
+      // "Nao vinculada" mesmo com a TAG atribuida.
+      tags: { select: { serialNumber: true } },
     },
   });
 
@@ -130,9 +135,9 @@ export default async function VehicleDetailsPage({
               </p>
             </div>
             <div>
-              <p className="text-sm text-slate">TAG Sem Parar</p>
+              <p className="text-sm text-slate">TAG</p>
               <p className="font-mono text-paper">
-                {vehicle.tagSerialNumber || 'Não vinculada'}
+                {vehicle.tags[0]?.serialNumber ?? 'Não vinculada'}
               </p>
             </div>
           </CardBody>
