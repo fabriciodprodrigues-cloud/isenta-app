@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { signOut, useSession } from 'next-auth/react';
 
 export default function AdminLayout({
   children,
@@ -9,6 +10,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   const menuItems = [
     { href: '/dashboard/admin', label: 'Visão Geral', icon: '📊' },
@@ -26,7 +28,9 @@ export default function AdminLayout({
   return (
     <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', background: '#0f172a'}}>
       {/* Sidebar */}
-      <aside style={{width: '16rem', background: '#1e293b', borderRight: '1px solid #334155', overflowY: 'auto'}}>
+      {/* Coluna em flex para o rodape ficar preso embaixo sem sobrepor o menu:
+          antes ele era position:absolute e cobria os ultimos itens. */}
+      <aside style={{width: '16rem', background: '#1e293b', borderRight: '1px solid #334155', display: 'flex', flexDirection: 'column'}}>
         {/* Logo */}
         <div style={{padding: '1.5rem', borderBottom: '1px solid #334155'}}>
           <Link href="/dashboard/admin">
@@ -38,7 +42,7 @@ export default function AdminLayout({
         </div>
 
         {/* Menu */}
-        <nav style={{padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+        <nav style={{padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflowY: 'auto'}}>
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -67,8 +71,42 @@ export default function AdminLayout({
         </nav>
 
         {/* Footer */}
-        <div style={{position: 'absolute', bottom: 0, left: 0, right: 0, padding: '1rem', background: 'linear-gradient(to top, rgba(15, 23, 42, 0.8), transparent)', textAlign: 'center'}}>
-          <p style={{fontSize: '0.75rem', color: '#94a3b8'}}>
+        <div style={{padding: '1rem', borderTop: '1px solid #334155'}}>
+          {session?.user?.email && (
+            <p
+              style={{
+                fontSize: '0.75rem',
+                color: '#cbd5e1',
+                marginBottom: '0.5rem',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={session.user.email}
+            >
+              {session.user.email}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() => signOut({ redirect: true, callbackUrl: '/login' })}
+            style={{
+              width: '100%',
+              padding: '0.5rem 1rem',
+              borderRadius: '0.5rem',
+              border: '1px solid #334155',
+              background: '#0f172a',
+              color: '#cbd5e1',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            Sair
+          </button>
+
+          <p style={{fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.75rem', textAlign: 'center'}}>
             Isenta © 2026
           </p>
         </div>
