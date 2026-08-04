@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { ESTADOS_BR } from '@/lib/utils';
 
 interface Account {
   id: string;
@@ -106,11 +107,11 @@ export default function GestaoOrgaos() {
             className="px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
           >
             <option value="">Filtrar por estado</option>
-            <option value="SP">São Paulo</option>
-            <option value="RJ">Rio de Janeiro</option>
-            <option value="MG">Minas Gerais</option>
-            <option value="BA">Bahia</option>
-            <option value="PR">Paraná</option>
+            {ESTADOS_BR.map(estado => (
+              <option key={estado.uf} value={estado.uf}>
+                {estado.nome}
+              </option>
+            ))}
           </select>
           <select
             value={filtroSaude}

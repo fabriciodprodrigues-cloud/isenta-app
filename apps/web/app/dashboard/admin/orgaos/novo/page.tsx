@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { ESTADOS_BR } from '@/lib/utils';
 
 export default function NovoOrgao() {
   const router = useRouter();
@@ -116,16 +117,11 @@ export default function NovoOrgao() {
                   className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
                   required
                 >
-                  <option value="SP">São Paulo</option>
-                  <option value="RJ">Rio de Janeiro</option>
-                  <option value="MG">Minas Gerais</option>
-                  <option value="BA">Bahia</option>
-                  <option value="PR">Paraná</option>
-                  <option value="RS">Rio Grande do Sul</option>
-                  <option value="PE">Pernambuco</option>
-                  <option value="CE">Ceará</option>
-                  <option value="PA">Pará</option>
-                  <option value="SC">Santa Catarina</option>
+                  {ESTADOS_BR.map(estado => (
+                    <option key={estado.uf} value={estado.uf}>
+                      {estado.nome}
+                    </option>
+                  ))}
                 </select>
               </div>
 
