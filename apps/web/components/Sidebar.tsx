@@ -155,22 +155,16 @@ export function Sidebar() {
           </p>
         </div>
 
-        <Link href="/dashboard/documentos">
+        {/*
+          Estes itens apontam para as telas de admin, nao para as do operador.
+          /dashboard/tags e /dashboard/concessionarias sao exclusivas do
+          operador e redirecionam o admin de volta para /dashboard — apontar
+          para elas aqui fazia o menu parecer que nao abria nada.
+        */}
+        <Link href="/dashboard/admin/tags">
           <div
             className={`rounded-lg px-4 py-2 transition-colors ${
-              isActive('/dashboard/documentos')
-                ? 'bg-ink-700 text-green'
-                : 'text-slate hover:text-paper hover:bg-ink-700/50'
-            }`}
-          >
-            Documentos
-          </div>
-        </Link>
-
-        <Link href="/dashboard/tags">
-          <div
-            className={`rounded-lg px-4 py-2 transition-colors ${
-              isActive('/dashboard/tags')
+              isActive('/dashboard/admin/tags')
                 ? 'bg-ink-700 text-green'
                 : 'text-slate hover:text-paper hover:bg-ink-700/50'
             }`}
@@ -179,15 +173,27 @@ export function Sidebar() {
           </div>
         </Link>
 
-        <Link href="/dashboard/concessionarias">
+        <Link href="/dashboard/admin/concessionarias">
           <div
             className={`rounded-lg px-4 py-2 transition-colors ${
-              isActive('/dashboard/concessionarias')
+              isActive('/dashboard/admin/concessionarias')
                 ? 'bg-ink-700 text-green'
                 : 'text-slate hover:text-paper hover:bg-ink-700/50'
             }`}
           >
             Concessionárias
+          </div>
+        </Link>
+
+        <Link href="/dashboard/admin/cadastros">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors ${
+              isActive('/dashboard/admin/cadastros')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            Cadastros
           </div>
         </Link>
       </nav>

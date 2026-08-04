@@ -162,6 +162,29 @@ export function get_category_label(category: string): string {
   return labels[category] || category;
 }
 
+// Concessionaire.estados é gravado ora como JSON (`["SP","RJ"]`), ora como
+// lista separada por vírgula. Normaliza os dois formatos para exibição.
+export function format_estados(estados: string | null): string {
+  if (!estados) return '';
+
+  const bruto = estados.trim();
+
+  if (bruto.startsWith('[')) {
+    try {
+      const lista = JSON.parse(bruto);
+      if (Array.isArray(lista)) return lista.join(', ');
+    } catch {
+      // Cai no tratamento de texto abaixo.
+    }
+  }
+
+  return bruto
+    .split(',')
+    .map(uf => uf.replace(/["[\]\s]/g, ''))
+    .filter(Boolean)
+    .join(', ');
+}
+
 // As 27 unidades federativas, em ordem alfabética de nome. Fonte única para
 // todos os seletores de estado — a coluna Account.state guarda a sigla.
 export const ESTADOS_BR: ReadonlyArray<{ uf: string; nome: string }> = [

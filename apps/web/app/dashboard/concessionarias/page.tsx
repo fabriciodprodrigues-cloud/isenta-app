@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { RequestExemptionModal } from '@/components/RequestExemptionModal';
+import { format_estados } from '@/lib/utils';
 import {
   Table,
   TableHead,
@@ -271,7 +272,12 @@ export default function ConcessionariasPage() {
                 >
                   <h3 className="font-semibold text-paper mb-2">{con.name}</h3>
                   <div className="space-y-1 text-sm text-paper-dim">
-                    <p>📍 {[con.cidade, con.estados].filter(Boolean).join(', ') || '—'}</p>
+                    <p>
+                      📍{' '}
+                      {[con.cidade, format_estados(con.estados)]
+                        .filter(Boolean)
+                        .join(', ') || '—'}
+                    </p>
                     <p>📱 {con.phone}</p>
                     <p>📧 {con.email}</p>
                     {con.website && (
