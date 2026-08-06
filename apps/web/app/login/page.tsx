@@ -109,15 +109,6 @@ export default function LoginPage() {
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
-
-          {/* Demo credentials */}
-          <div className="mt-8 rounded-lg border border-amber-dim bg-amber-dim/10 p-4">
-            <p className="text-xs font-medium text-amber mb-2">Demo (em desenvolvimento):</p>
-            <p className="text-xs text-slate font-mono">
-              Email: admin@isenta.local<br />
-              Senha: admin123
-            </p>
-          </div>
         </div>
       </div>
     </div>
