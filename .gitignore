@@ -16,6 +16,9 @@ build/
 coverage/
 tmp/
 
+# Scripts descartaveis de diagnostico e teste manual
+scripts-tmp-*.js
+
 # Bancos SQLite locais (o projeto usa PostgreSQL)
 *.db
 *.db-journal
