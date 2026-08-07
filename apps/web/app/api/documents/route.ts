@@ -53,16 +53,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      {
-        error:
-          'O armazenamento de arquivos não está configurado no servidor (BLOB_READ_WRITE_TOKEN ausente).',
-      },
-      { status: 503 }
-    );
-  }
-
   try {
     const form = await request.formData();
     const arquivo = form.get('file');
@@ -149,6 +139,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(documento, { status: 201 });
   } catch (error) {
     console.error('Erro ao enviar documento:', error);
+
+    // Numa store privada o Vercel autentica por OIDC e injeta VERCEL_OIDC_TOKEN
+    // + BLOB_STORE_ID; em outros casos usa BLOB_READ_WRITE_TOKEN. Conferir uma
+    // variavel especifica de antemao bloqueava ambientes validos, entao a falta
+    // de credencial e reconhecida pelo proprio erro do SDK.
+    const mensagem = error instanceof Error ? error.message : String(error);
+    const semCredencial =
+      /token|credential|unauthorized|not authorized|BLOB_/i.test(mensagem);
+
+    if (semCredencial) {
+      return NextResponse.json(
+        {
+          error:
+            'O armazenamento de arquivos não está acessível. Verifique se a store do Blob está conectada a este projeto no Vercel.',
+          detalhe: mensagem,
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json({ error: 'Erro ao enviar documento' }, { status: 500 });
   }
 }
