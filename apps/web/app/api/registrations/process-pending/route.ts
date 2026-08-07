@@ -24,6 +24,9 @@ export async function POST(request: Request) {
       // nenhuma solicitacao saia — o resumo agora diz o que de fato ocorreu.
       message:
         `${resumo.enviados} enviada(s)` +
+        (resumo.documentosFaltando > 0
+          ? `, ${resumo.documentosFaltando} aguardando documento`
+          : '') +
         (resumo.naoAutomatizaveis > 0
           ? `, ${resumo.naoAutomatizaveis} sem canal automatizável`
           : '') +

@@ -9,8 +9,9 @@ import { sendExemptionRequestEmail } from './email-service';
  * porque so o erro merece nova tentativa.
  */
 export type ResultadoEnvio =
-  | { status: 'enviado'; canal: 'EMAIL'; destino: string }
+  | { status: 'enviado'; canal: 'EMAIL'; destino: string; anexos: number }
   | { status: 'nao_automatizavel'; motivo: string }
+  | { status: 'documento_faltando'; motivo: string }
   | { status: 'ignorado'; motivo: string };
 
 export async function processRegistration(
@@ -19,7 +20,12 @@ export async function processRegistration(
   const registration = await prisma.concesssionaireRegistration.findUnique({
     where: { id: registrationId },
     include: {
-      vehicle: { include: { account: true } },
+      vehicle: {
+        include: {
+          account: true,
+          documents: { select: { type: true, fileName: true, url: true } },
+        },
+      },
       concessionaire: true,
     },
   });
@@ -56,6 +62,30 @@ export async function processRegistration(
     };
   }
 
+  // Toda concessionaria exige o CRLV, e veiculo locado exige tambem o
+  // contrato. Enviar sem eles garante recusa e gasta uma ida e volta com a
+  // concessionaria — melhor barrar aqui e avisar quem opera.
+  const documentos = vehicle.documents;
+  const temCrlv = documentos.some(d => d.type === 'crlv');
+
+  if (!temCrlv) {
+    return {
+      status: 'documento_faltando',
+      motivo: `Anexe o CRLV do veículo ${vehicle.plate} antes de solicitar a isenção`,
+    };
+  }
+
+  if (vehicle.type === 'locado' && !documentos.some(d => d.type === 'contract')) {
+    return {
+      status: 'documento_faltando',
+      motivo: `O veículo ${vehicle.plate} é locado: anexe o contrato de locação antes de solicitar a isenção`,
+    };
+  }
+
+  const anexos = documentos
+    .filter(d => d.type === 'crlv' || d.type === 'contract')
+    .map(d => ({ fileName: d.fileName, url: d.url }));
+
   await sendExemptionRequestEmail({
     registrationId,
     vehiclePlate: vehicle.plate,
@@ -69,18 +99,21 @@ export async function processRegistration(
     cor: vehicle.cor,
     anoFabricacao: vehicle.anoFabricacao,
     anoModelo: vehicle.anoModelo,
+    anexos,
   });
 
   return {
     status: 'enviado',
     canal: 'EMAIL',
     destino: concessionaire.canalIsentos,
+    anexos: anexos.length,
   };
 }
 
 export interface ResumoLote {
   enviados: number;
   naoAutomatizaveis: number;
+  documentosFaltando: number;
   ignorados: number;
   erros: number;
   detalhes: string[];
@@ -103,6 +136,7 @@ export async function processPendingRegistrations(
   const resumo: ResumoLote = {
     enviados: 0,
     naoAutomatizaveis: 0,
+    documentosFaltando: 0,
     ignorados: 0,
     erros: 0,
     detalhes: [],
@@ -115,6 +149,9 @@ export async function processPendingRegistrations(
       if (resultado.status === 'enviado') resumo.enviados++;
       else if (resultado.status === 'nao_automatizavel') {
         resumo.naoAutomatizaveis++;
+        resumo.detalhes.push(resultado.motivo);
+      } else if (resultado.status === 'documento_faltando') {
+        resumo.documentosFaltando++;
         resumo.detalhes.push(resultado.motivo);
       } else resumo.ignorados++;
     } catch (error) {

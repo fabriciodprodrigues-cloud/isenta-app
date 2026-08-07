@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
+import { DocumentUpload } from '@/components/DocumentUpload';
 import {
   format_plate,
   format_date,
@@ -152,33 +153,16 @@ export default async function VehicleDetailsPage({
           </h2>
         </CardHeader>
         <CardBody>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg border border-white/8 bg-ink-700/50">
-              <div>
-                <p className="text-paper font-medium">CRLV</p>
-                <p className="text-sm text-slate">
-                  {vehicle.crlvUrl ? 'Enviado' : 'Pendente'}
-                </p>
-              </div>
-              <Badge variant={vehicle.crlvUrl ? 'success' : 'default'} size="sm">
-                {vehicle.crlvUrl ? '✓' : 'Necessário'}
-              </Badge>
-            </div>
-
-            {vehicle.type === 'locado' && (
-              <div className="flex items-center justify-between p-3 rounded-lg border border-white/8 bg-ink-700/50">
-                <div>
-                  <p className="text-paper font-medium">Contrato de Locação</p>
-                  <p className="text-sm text-slate">
-                    {vehicle.contractUrl ? 'Enviado' : 'Pendente'}
-                  </p>
-                </div>
-                <Badge variant={vehicle.contractUrl ? 'success' : 'default'} size="sm">
-                  {vehicle.contractUrl ? '✓' : 'Necessário'}
-                </Badge>
-              </div>
-            )}
-          </div>
+          {/*
+            A fonte de verdade e a relacao Document. Antes esta secao lia
+            vehicle.crlvUrl e vehicle.contractUrl, campos desnormalizados que
+            nenhuma rota escrevia — o mesmo defeito que fazia a TAG aparecer
+            como "nao vinculada".
+          */}
+          <DocumentUpload
+            vehicleId={vehicle.id}
+            exigeContrato={vehicle.type === 'locado'}
+          />
         </CardBody>
       </Card>
 

@@ -54,9 +54,21 @@ export async function POST(request: Request) {
     if (resultado.status === 'enviado') {
       return NextResponse.json({
         success: true,
-        message: `Solicitação enviada para ${resultado.destino}`,
+        message:
+          `Solicitação enviada para ${resultado.destino}` +
+          (resultado.anexos > 0 ? ` com ${resultado.anexos} documento(s) anexado(s)` : ''),
         canal: resultado.canal,
       });
+    }
+
+    // 428: a requisição está correta, mas falta uma pré-condição do lado do
+    // usuário — anexar o documento. Distinguir de 422 ajuda a interface a
+    // orientar em vez de apenas informar falha.
+    if (resultado.status === 'documento_faltando') {
+      return NextResponse.json(
+        { success: false, error: resultado.motivo },
+        { status: 428 }
+      );
     }
 
     if (resultado.status === 'nao_automatizavel') {
