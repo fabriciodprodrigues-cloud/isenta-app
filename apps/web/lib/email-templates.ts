@@ -41,8 +41,8 @@ export function generate_alert_email(data: AlertEmailData) {
 <body>
   <div class="container">
     <div class="header">
-      <h1>⚠️ Alerta de Vencimento</h1>
-      <p>Isenção de Pedágio - Isenta</p>
+      <h1>Vencimento de Isenção de Pedágio</h1>
+      <p>Isenta — Gestão de Isenções</p>
     </div>
 
     <div class="content">
@@ -86,7 +86,11 @@ export function generate_alert_email(data: AlertEmailData) {
   `.trim();
 
   return {
-    subject: `⚠️ Alerta: Isenção de ${data.plate} vence ${daysText}`,
+    // Sem emoji e sem palavra de alarme no inicio: "⚠️ Alerta:" combinado com
+    // urgencia e padrao reconhecido pelos filtros de spam. O assunto agora
+    // identifica o orgao, o que tambem ajuda o destinatario a reconhecer o
+    // remetente.
+    subject: `Isenção do veículo ${data.plate} vence ${daysText} — ${data.accountName}`,
     html,
     text: `
 Alerta de Vencimento de Isenção
