@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { processPendingRegistrations } from '@/lib/registration-orchestrator';
+import { EmailNaoConfiguradoError } from '@/lib/email-service';
 import { NextResponse } from 'next/server';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
@@ -14,15 +15,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    console.log('🔄 Iniciando processamento de solicitações pendentes...');
-    await processPendingRegistrations();
+    const resumo = await processPendingRegistrations();
 
     return NextResponse.json({
       success: true,
-      message: 'Solicitações pendentes processadas com sucesso',
+      ...resumo,
+      // Antes a resposta era sempre "processadas com sucesso", mesmo quando
+      // nenhuma solicitacao saia — o resumo agora diz o que de fato ocorreu.
+      message:
+        `${resumo.enviados} enviada(s)` +
+        (resumo.naoAutomatizaveis > 0
+          ? `, ${resumo.naoAutomatizaveis} sem canal automatizável`
+          : '') +
+        (resumo.erros > 0 ? `, ${resumo.erros} com erro` : ''),
     });
   } catch (error) {
-    console.error('❌ Erro ao processar solicitações:', error);
+    if (error instanceof EmailNaoConfiguradoError) {
+      return NextResponse.json(
+        {
+          error:
+            'O envio de e-mail ainda não está configurado no servidor. Nenhuma solicitação foi marcada como enviada.',
+        },
+        { status: 503 }
+      );
+    }
+
+    console.error('Erro ao processar solicitações:', error);
     return NextResponse.json(
       { error: 'Erro ao processar solicitações' },
       { status: 500 }

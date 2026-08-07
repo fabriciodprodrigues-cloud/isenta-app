@@ -8,25 +8,78 @@ interface SendExemptionRequestEmailProps {
   concessionaireName: string;
   accountName: string;
   cnpj: string;
-  crlvUrl?: string;
+  renavam?: string | null;
+  marca?: string | null;
+  modelo?: string | null;
+  cor?: string | null;
+  anoFabricacao?: number | null;
+  anoModelo?: number | null;
+}
+
+export class EmailNaoConfiguradoError extends Error {
+  constructor() {
+    super(
+      'Envio de e-mail não configurado: defina SMTP_HOST, SMTP_USER e SMTP_PASSWORD.'
+    );
+    this.name = 'EmailNaoConfiguradoError';
+  }
 }
 
 const createEmailTransport = () => {
-  if (process.env.SMTP_HOST) {
-    return nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER
-        ? {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASSWORD,
-          }
-        : undefined,
-    });
-  }
-  return null;
+  if (!process.env.SMTP_HOST) return null;
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: process.env.SMTP_USER
+      ? {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASSWORD,
+        }
+      : undefined,
+  });
 };
+
+export function emailEstaConfigurado(): boolean {
+  return Boolean(process.env.SMTP_HOST);
+}
+
+/**
+ * Envio generico. Lanca EmailNaoConfiguradoError se o SMTP nao estiver
+ * definido, para que quem chama nunca registre um envio que nao aconteceu.
+ */
+export async function enviarEmail({
+  para,
+  assunto,
+  texto,
+  html,
+}: {
+  para: string;
+  assunto: string;
+  texto: string;
+  html?: string;
+}) {
+  const transporter = createEmailTransport();
+  if (!transporter) throw new EmailNaoConfiguradoError();
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || 'noreply@plataformaisenta.com',
+    to: para,
+    replyTo: process.env.EMAIL_REPLY_TO || undefined,
+    subject: assunto,
+    text: texto,
+    html: html ?? undefined,
+  });
+}
+
+function linhaSeTiver(rotulo: string, valor: string | number | null | undefined) {
+  return valor ? `<p><strong>${rotulo}:</strong> ${valor}</p>` : '';
+}
+
+function textoSeTiver(rotulo: string, valor: string | number | null | undefined) {
+  return valor ? `\n- ${rotulo}: ${valor}` : '';
+}
 
 export async function sendExemptionRequestEmail({
   registrationId,
@@ -35,12 +88,23 @@ export async function sendExemptionRequestEmail({
   concessionaireName,
   accountName,
   cnpj,
-  crlvUrl,
+  renavam,
+  marca,
+  modelo,
+  cor,
+  anoFabricacao,
+  anoModelo,
 }: SendExemptionRequestEmailProps) {
-  try {
-    console.log(`📧 Enviando solicitação de isenção para ${concessionaireName} (${concessionaireEmail})`);
+  const transporter = createEmailTransport();
 
-    const emailBody = `
+  // Sem transporte configurado o envio precisa FALHAR. A versao anterior
+  // marcava a solicitacao como "enviado" e retornava true, de modo que o
+  // sistema afirmava ter notificado a concessionaria sem nada ter saido.
+  if (!transporter) {
+    throw new EmailNaoConfiguradoError();
+  }
+
+  const emailBody = `
 Prezados Senhores,
 
 Solicitamos a análise e aprovação de isenção de pedágio para o seguinte veículo:
@@ -50,40 +114,39 @@ DADOS DO ÓRGÃO PÚBLICO:
 - CNPJ: ${cnpj}
 
 DADOS DO VEÍCULO:
-- Placa: ${vehiclePlate}
+- Placa: ${vehiclePlate}${textoSeTiver('RENAVAM', renavam)}${textoSeTiver('Marca', marca)}${textoSeTiver('Modelo', modelo)}${textoSeTiver('Cor', cor)}${textoSeTiver('Ano de fabricação', anoFabricacao)}${textoSeTiver('Ano do modelo', anoModelo)}
 
 Protocolo de Referência: ${registrationId}
 
 Aguardamos retorno com a confirmação de recebimento e análise da solicitação.
 
 Atenciosamente,
-Sistema Isenta
-Plataforma de Gestão de Isenções de Pedágio
-    `.trim();
+${accountName}
+via Isenta — Plataforma de Gestão de Isenções de Pedágio
+  `.trim();
 
-    const htmlBody = `
+  const htmlBody = `
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
   <style>
     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .header { background-color: #2d5f2e; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
-    .header h1 { margin: 0; font-size: 24px; }
+    .header h1 { margin: 0; font-size: 20px; }
     .content { background-color: #f9f9f9; padding: 20px; }
     .section { margin: 20px 0; }
     .section h2 { font-size: 14px; font-weight: bold; color: #2d5f2e; margin: 10px 0 5px 0; }
     .section p { margin: 5px 0; }
     .protocol { background-color: #e8f5e9; padding: 10px; border-left: 4px solid #2d5f2e; margin: 20px 0; }
-    .protocol strong { color: #2d5f2e; }
     .footer { background-color: #f0f0f0; padding: 15px; border-radius: 0 0 5px 5px; font-size: 12px; color: #666; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <h1>🚗 Solicitação de Isenção de Pedágio</h1>
+      <h1>Solicitação de Isenção de Pedágio</h1>
     </div>
     <div class="content">
       <p>Prezados Senhores,</p>
@@ -91,14 +154,20 @@ Plataforma de Gestão de Isenções de Pedágio
       <p>Solicitamos a análise e aprovação de isenção de pedágio para o seguinte veículo:</p>
 
       <div class="section">
-        <h2>📋 DADOS DO ÓRGÃO PÚBLICO</h2>
+        <h2>DADOS DO ÓRGÃO PÚBLICO</h2>
         <p><strong>Nome:</strong> ${accountName}</p>
         <p><strong>CNPJ:</strong> ${cnpj}</p>
       </div>
 
       <div class="section">
-        <h2>🚙 DADOS DO VEÍCULO</h2>
+        <h2>DADOS DO VEÍCULO</h2>
         <p><strong>Placa:</strong> ${vehiclePlate}</p>
+        ${linhaSeTiver('RENAVAM', renavam)}
+        ${linhaSeTiver('Marca', marca)}
+        ${linhaSeTiver('Modelo', modelo)}
+        ${linhaSeTiver('Cor', cor)}
+        ${linhaSeTiver('Ano de fabricação', anoFabricacao)}
+        ${linhaSeTiver('Ano do modelo', anoModelo)}
       </div>
 
       <div class="protocol">
@@ -108,44 +177,34 @@ Plataforma de Gestão de Isenções de Pedágio
       <p>Aguardamos retorno com a confirmação de recebimento e análise da solicitação.</p>
 
       <p><strong>Atenciosamente,</strong><br/>
-      Sistema Isenta<br/>
-      Plataforma de Gestão de Isenções de Pedágio</p>
+      ${accountName}<br/>
+      via Isenta — Plataforma de Gestão de Isenções de Pedágio</p>
     </div>
     <div class="footer">
-      <p>Este é um email automático. Favor não responder diretamente. Utilize o protocolo acima para referências futuras.</p>
+      <p>Utilize o protocolo acima para referências futuras sobre esta solicitação.</p>
     </div>
   </div>
 </body>
 </html>
-    `.trim();
+  `.trim();
 
-    const transporter = createEmailTransport();
-    if (!transporter) {
-      console.warn('⚠️  Email transporter não configurado - modo desenvolvimento');
-      await prisma.concesssionaireRegistration.update({
-        where: { id: registrationId },
-        data: { status: 'enviado', sentAt: new Date() },
-      });
-      return true;
-    }
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || 'noreply@plataformaisenta.com',
+    to: concessionaireEmail,
+    replyTo: process.env.EMAIL_REPLY_TO || undefined,
+    subject: `Solicitação de Isenção de Pedágio - Veículo ${vehiclePlate} - ${accountName}`,
+    text: emailBody,
+    // Antes ia `<pre>${emailBody}</pre>`: o htmlBody era montado e descartado.
+    html: htmlBody,
+  });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || 'noreply@isenta.local',
-      to: concessionaireEmail,
-      subject: `Solicitação de Isenção - Veículo ${vehiclePlate}`,
-      text: emailBody,
-      html: `<pre>${emailBody}</pre>`,
-    });
+  // Só depois do envio bem-sucedido. Se sendMail lancar, a solicitacao
+  // permanece em rascunho e pode ser reenviada.
+  await prisma.concesssionaireRegistration.update({
+    where: { id: registrationId },
+    data: { status: 'enviado', sentAt: new Date() },
+  });
 
-    await prisma.concesssionaireRegistration.update({
-      where: { id: registrationId },
-      data: { status: 'enviado', sentAt: new Date() },
-    });
-
-    console.log(`✅ E-mail enviado para ${concessionaireEmail}`);
-    return true;
-  } catch (error) {
-    console.error(`❌ Erro ao enviar e-mail:`, error);
-    throw error;
-  }
+  console.log(`E-mail de isenção enviado para ${concessionaireEmail} (${concessionaireName})`);
+  return true;
 }

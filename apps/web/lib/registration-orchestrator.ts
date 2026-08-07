@@ -1,76 +1,129 @@
 import { prisma } from './prisma';
-import { getConcessionaireConfig } from './concessionaire-config';
 import { sendExemptionRequestEmail } from './email-service';
-import { sendViaPortal } from './rpa-service';
 
-export async function processRegistration(registrationId: string) {
-  try {
-    const registration = await prisma.concesssionaireRegistration.findUnique({
-      where: { id: registrationId },
-      include: {
-        vehicle: { include: { account: true } },
-        concessionaire: true,
-      },
-    });
+/**
+ * Resultado do processamento de uma solicitacao.
+ *
+ * `nao_automatizavel` nao e falha: e o caso legitimo de concessionaria cujo
+ * canal exige portal ou tratativa manual. Distinguir isso de erro importa
+ * porque so o erro merece nova tentativa.
+ */
+export type ResultadoEnvio =
+  | { status: 'enviado'; canal: 'EMAIL'; destino: string }
+  | { status: 'nao_automatizavel'; motivo: string }
+  | { status: 'ignorado'; motivo: string };
 
-    if (!registration) {
-      throw new Error(`Solicitação ${registrationId} não encontrada`);
-    }
-
-    if (registration.status !== 'rascunho') {
-      console.log(`⚠️  Solicitação ${registrationId} não está em rascunho`);
-      return;
-    }
-
-    const config = getConcessionaireConfig(registration.concessionaireId);
-    if (!config) {
-      console.error(`❌ Configuração não encontrada para concessionária ${registration.concessionaireId}`);
-      return;
-    }
-
-    console.log(`🔄 Processando solicitação ${registrationId} via ${config.channel}`);
-
-    if (config.channel === 'email' && config.email) {
-      await sendExemptionRequestEmail({
-        registrationId,
-        vehiclePlate: registration.vehicle.plate,
-        concessionaireEmail: config.email,
-        concessionaireName: config.name,
-        accountName: registration.vehicle.account.name,
-        cnpj: registration.vehicle.account.cnpj,
-        crlvUrl: registration.vehicle.crlvUrl || undefined,
-      });
-      console.log(`✅ Solicitação ${registrationId} enviada via e-mail`);
-    } else if (config.channel === 'portal' && config.portalUrl) {
-      await sendViaPortal({
-        registrationId,
-        vehiclePlate: registration.vehicle.plate,
-        concessionaireEmail: config.email || '',
-        concessionaireName: config.name,
-        accountName: registration.vehicle.account.name,
-        cnpj: registration.vehicle.account.cnpj,
-        portalUrl: config.portalUrl,
-      });
-      console.log(`✅ Solicitação ${registrationId} enviada via portal RPA`);
-    }
-  } catch (error) {
-    console.error(`❌ Erro ao processar solicitação ${registrationId}:`, error);
-    throw error;
-  }
-}
-
-export async function processPendingRegistrations() {
-  const pending = await prisma.concesssionaireRegistration.findMany({
-    where: { status: 'rascunho' },
+export async function processRegistration(
+  registrationId: string
+): Promise<ResultadoEnvio> {
+  const registration = await prisma.concesssionaireRegistration.findUnique({
+    where: { id: registrationId },
+    include: {
+      vehicle: { include: { account: true } },
+      concessionaire: true,
+    },
   });
 
-  console.log(`📦 Processando ${pending.length} solicitações pendentes`);
+  if (!registration) {
+    throw new Error(`Solicitação ${registrationId} não encontrada`);
+  }
 
-  for (const reg of pending) {
+  if (registration.status !== 'rascunho') {
+    return {
+      status: 'ignorado',
+      motivo: `Solicitação já está em "${registration.status}"`,
+    };
+  }
+
+  const { concessionaire, vehicle } = registration;
+
+  // O canal vem do banco (canalIsentos/tipoCanal), que e o dado curado
+  // manualmente. Antes isto vinha de um mapa fixo em concessionaire-config.ts
+  // cujos ids eram placeholders ("eco050-id") ou cuids de um banco anterior —
+  // nenhum casava, entao o orquestrador nunca encontrava configuracao e
+  // desistia em silencio.
+  if (!concessionaire.canalIsentos) {
+    return {
+      status: 'nao_automatizavel',
+      motivo: `${concessionaire.name} não tem canal de isentos cadastrado`,
+    };
+  }
+
+  if (concessionaire.tipoCanal !== 'EMAIL') {
+    return {
+      status: 'nao_automatizavel',
+      motivo: `${concessionaire.name} usa canal ${concessionaire.tipoCanal ?? 'não definido'}, que ainda exige tratativa manual`,
+    };
+  }
+
+  await sendExemptionRequestEmail({
+    registrationId,
+    vehiclePlate: vehicle.plate,
+    concessionaireEmail: concessionaire.canalIsentos,
+    concessionaireName: concessionaire.name,
+    accountName: vehicle.account.name,
+    cnpj: vehicle.account.cnpj,
+    renavam: vehicle.renavam,
+    marca: vehicle.marca,
+    modelo: vehicle.modelo,
+    cor: vehicle.cor,
+    anoFabricacao: vehicle.anoFabricacao,
+    anoModelo: vehicle.anoModelo,
+  });
+
+  return {
+    status: 'enviado',
+    canal: 'EMAIL',
+    destino: concessionaire.canalIsentos,
+  };
+}
+
+export interface ResumoLote {
+  enviados: number;
+  naoAutomatizaveis: number;
+  ignorados: number;
+  erros: number;
+  detalhes: string[];
+}
+
+export async function processPendingRegistrations(
+  limite = 50
+): Promise<ResumoLote> {
+  // Só faz sentido tentar quem tem canal de e-mail; o resto sairia como
+  // nao_automatizavel a cada execucao, poluindo o resumo.
+  const pendentes = await prisma.concesssionaireRegistration.findMany({
+    where: {
+      status: 'rascunho',
+      concessionaire: { tipoCanal: 'EMAIL', NOT: { canalIsentos: null } },
+    },
+    take: limite,
+    select: { id: true },
+  });
+
+  const resumo: ResumoLote = {
+    enviados: 0,
+    naoAutomatizaveis: 0,
+    ignorados: 0,
+    erros: 0,
+    detalhes: [],
+  };
+
+  for (const pendente of pendentes) {
     try {
-      await processRegistration(reg.id);
+      const resultado = await processRegistration(pendente.id);
+
+      if (resultado.status === 'enviado') resumo.enviados++;
+      else if (resultado.status === 'nao_automatizavel') {
+        resumo.naoAutomatizaveis++;
+        resumo.detalhes.push(resultado.motivo);
+      } else resumo.ignorados++;
     } catch (error) {
-      console.error(`Erro na solicitação ${reg.id}:`, error);
+      resumo.erros++;
+      const mensagem = error instanceof Error ? error.message : String(error);
+      resumo.detalhes.push(`${pendente.id}: ${mensagem}`);
+      console.error(`Erro na solicitação ${pendente.id}:`, error);
     }
   }
+
+  return resumo;
 }
