@@ -24,10 +24,13 @@ export async function GET(request: NextRequest) {
       query.type = type;
     }
 
-    if (accountId) {
+    // Mesma regra de /api/vehicles: o operador nao escolhe a conta que
+    // consulta. Antes o accountId recebido era usado como veio, expondo os
+    // alertas de qualquer orgao a qualquer operador autenticado.
+    if (session.user?.role === 'operator') {
+      query.accountId = session.user?.accountId ?? '__sem_conta__';
+    } else if (accountId) {
       query.accountId = accountId;
-    } else if (session.user?.role === 'operator') {
-      query.accountId = session.user?.accountId;
     }
 
     const alerts = await prisma.alert.findMany({

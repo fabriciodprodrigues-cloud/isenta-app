@@ -20,7 +20,6 @@ interface Document {
   id: string;
   vehicleId: string;
   type: string;
-  url: string;
   fileName: string;
   fileSize: number;
   uploadedBy: string;
@@ -148,8 +147,14 @@ export default function DocumentosPage() {
                         {format_date(new Date(doc.uploadedAt))}
                       </TableCell>
                       <TableCell>
+                        {/*
+                          Vai pela rota autenticada, nao pelo campo url. Com a
+                          store privada, url guarda o pathname do blob — um
+                          link direto para ele nao resolve, e ainda expunha o
+                          caminho interno do arquivo.
+                        */}
                         <a
-                          href={doc.url}
+                          href={`/api/documents/${doc.id}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-accent hover:underline"

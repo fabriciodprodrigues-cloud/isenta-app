@@ -27,11 +27,15 @@ export async function GET(request: NextRequest) {
     const accountId = searchParams.get('accountId');
     const includeDocuments = searchParams.get('includeDocuments') === 'true';
 
+    // O operador fica preso a propria conta, ignorando o accountId recebido.
+    // Antes o parametro era usado como veio: bastava um operador informar o id
+    // de outro orgao para listar a frota alheia — e, com includeDocuments,
+    // tambem os documentos.
     const query: any = {};
-    if (accountId) {
+    if (session.user?.role === 'operator') {
+      query.accountId = session.user?.accountId ?? '__sem_conta__';
+    } else if (accountId) {
       query.accountId = accountId;
-    } else if (session.user?.role === 'operator') {
-      query.accountId = session.user?.accountId;
     }
 
     const include: any = {
@@ -41,7 +45,18 @@ export async function GET(request: NextRequest) {
     };
 
     if (includeDocuments) {
-      include.documents = true;
+      // Sem a url: ela guarda o caminho interno no Blob e nao tem uso no
+      // cliente, que baixa por /api/documents/[id].
+      include.documents = {
+        select: {
+          id: true,
+          type: true,
+          fileName: true,
+          fileSize: true,
+          uploadedBy: true,
+          uploadedAt: true,
+        },
+      };
     }
 
     const vehicles = await prisma.vehicle.findMany({
