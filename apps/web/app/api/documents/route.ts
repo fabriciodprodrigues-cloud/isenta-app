@@ -115,10 +115,12 @@ export async function POST(request: NextRequest) {
     const extensao = arquivo.name.split('.').pop()?.toLowerCase() || 'pdf';
     const caminho = `documentos/${veiculo!.accountId}/${veiculo!.plate}/${tipo}.${extensao}`;
 
+    // Store privada: toda leitura exige autenticacao. E o modo adequado para
+    // CRLV, que traz dados do veiculo e do orgao.
     const blob = await put(caminho, arquivo, {
-      access: 'public',
-      // Sufixo aleatorio impede que a url seja deduzida a partir da placa —
-      // e a url ainda assim nao e exposta pela API.
+      access: 'private',
+      // Sufixo aleatorio para que reenviar o mesmo tipo nao sobrescreva o
+      // anterior — o Blob leva ate 60s para propagar sobrescrita.
       addRandomSuffix: true,
       contentType: arquivo.type,
     });
@@ -127,7 +129,9 @@ export async function POST(request: NextRequest) {
       data: {
         vehicleId,
         type: tipo,
-        url: blob.url,
+        // Guardamos o pathname, nao a url: e o que get() precisa, e mantem o
+        // registro independente do dominio da store.
+        url: blob.pathname,
         fileName: arquivo.name,
         fileSize: arquivo.size,
         uploadedBy: (session.user as any).email ?? 'desconhecido',

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { del } from '@vercel/blob';
+import { get, del } from '@vercel/blob';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { podeAcessarDocumento } from '@/lib/document-access';
@@ -10,10 +10,10 @@ export const dynamic = 'force-dynamic';
 /**
  * Baixa o documento.
  *
- * O arquivo e buscado no Blob pelo servidor e devolvido ao cliente, de modo
- * que a url do Blob nunca chega ao navegador. Redirecionar para ela entregaria
- * um link permanente e sem autenticacao — bastaria repassa-lo para qualquer
- * pessoa ver um CRLV.
+ * A store e privada: o arquivo so pode ser lido com credencial, e quem le e o
+ * servidor. A permissao e conferida imediatamente antes do get(), como a
+ * propria documentacao da Vercel recomenda — auth em middleware pode ser
+ * contornada por erro de configuracao e expor conteudo privado.
  */
 export async function GET(
   _request: NextRequest,
@@ -32,24 +32,24 @@ export async function GET(
   const { documento } = permissao;
 
   try {
-    const resposta = await fetch(documento.url);
+    const resultado = await get(documento.url, { access: 'private' });
 
-    if (!resposta.ok || !resposta.body) {
-      console.error(
-        `Blob indisponível para o documento ${documento.id}: HTTP ${resposta.status}`
-      );
+    if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+      console.error(`Blob indisponível para o documento ${documento.id}`);
       return NextResponse.json(
         { error: 'Arquivo não disponível no armazenamento' },
         { status: 502 }
       );
     }
 
-    return new NextResponse(resposta.body, {
+    return new NextResponse(resultado.stream, {
       headers: {
-        'Content-Type':
-          resposta.headers.get('content-type') ?? 'application/octet-stream',
+        'Content-Type': resultado.blob.contentType ?? 'application/octet-stream',
         'Content-Disposition': `inline; filename="${encodeURIComponent(documento.fileName)}"`,
-        // Documento sensivel: nao deve ficar em cache compartilhado.
+        // nosniff impede que o navegador reinterprete o tipo do arquivo.
+        'X-Content-Type-Options': 'nosniff',
+        // CRLV e dado pessoal: nada fica em disco, cada acesso passa pela
+        // verificacao de permissao acima.
         'Cache-Control': 'private, no-store',
       },
     });

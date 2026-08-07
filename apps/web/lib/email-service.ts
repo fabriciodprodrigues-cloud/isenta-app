@@ -1,8 +1,10 @@
 import nodemailer from 'nodemailer';
+import { get } from '@vercel/blob';
 import { prisma } from './prisma';
 
 interface AnexoDocumento {
   fileName: string;
+  /** Pathname do blob na store privada, nao uma url publica. */
   url: string;
 }
 
@@ -34,15 +36,20 @@ async function baixarAnexos(anexos: AnexoDocumento[]) {
 
   for (const anexo of anexos) {
     try {
-      const resposta = await fetch(anexo.url);
-      if (!resposta.ok) {
-        console.error(`Anexo indisponível (${anexo.fileName}): HTTP ${resposta.status}`);
+      // A store e privada: um fetch direto na url retorna 401. So o SDK
+      // autentica a leitura.
+      const resultado = await get(anexo.url, { access: 'private' });
+
+      if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+        console.error(`Anexo indisponível no Blob: ${anexo.fileName}`);
         continue;
       }
-      baixados.push({
-        filename: anexo.fileName,
-        content: Buffer.from(await resposta.arrayBuffer()),
-      });
+
+      const buffer = Buffer.from(
+        await new Response(resultado.stream).arrayBuffer()
+      );
+
+      baixados.push({ filename: anexo.fileName, content: buffer });
     } catch (erro) {
       console.error(`Falha ao baixar anexo ${anexo.fileName}:`, erro);
     }
