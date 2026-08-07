@@ -1,3 +1,5 @@
+import { format_date } from './utils';
+
 interface AlertEmailData {
   accountName: string;
   responsibleName: string;
@@ -62,11 +64,7 @@ export function generate_alert_email(data: AlertEmailData) {
         <p class="value mono">${data.plate}</p>
 
         <div class="label" style="margin-top: 12px;">Data de Vencimento</div>
-        <p class="value">${data.expiresAt.toLocaleDateString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-        })}</p>
+        <p class="value">${format_date(data.expiresAt)}</p>
       </div>
 
       <p>
@@ -102,7 +100,7 @@ A isenção de pedágio do veículo ${data.plate} vence ${daysText}.
 
 Órgão: ${data.accountName}
 Placa: ${data.plate}
-Vencimento: ${data.expiresAt.toLocaleDateString('pt-BR')}
+Vencimento: ${format_date(data.expiresAt)}
 
 Renove o cadastro na concessionária antes do vencimento para evitar multas.
 

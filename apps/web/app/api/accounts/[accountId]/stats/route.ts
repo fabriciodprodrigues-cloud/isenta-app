@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { days_until_expiry } from '@/lib/utils';
 import { NextResponse } from 'next/server';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
@@ -43,7 +44,9 @@ export async function GET(
     const draftVehicles = vehicles.filter(v => v.status === 'rascunho').length;
     const expiringIn30Days = vehicles.filter(v => {
       if (!v.expiresAt) return false;
-      const days = Math.ceil((v.expiresAt.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      // Terceira implementacao do mesmo calculo no projeto, e a unica que nao
+      // normalizava o dia — contava fracoes de 24h a partir do instante atual.
+      const days = days_until_expiry(v.expiresAt);
       return days > 0 && days <= 30;
     }).length;
 

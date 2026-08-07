@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { format_data_hoje } from '@/lib/utils';
 
 export default function AdminDashboard() {
   // Mock data - será substituído por dados reais
@@ -67,7 +68,7 @@ export default function AdminDashboard() {
       <div>
         <h1 className="text-4xl font-bold text-paper">Visão Geral</h1>
         <p className="text-paper-dim mt-2">
-          Dashboard central de operação — {new Date().toLocaleDateString('pt-BR')}
+          Dashboard central de operação — {format_data_hoje()}
         </p>
       </div>
 

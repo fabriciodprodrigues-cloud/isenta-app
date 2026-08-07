@@ -70,21 +70,72 @@ export function validate_renavam(renavam: string): boolean {
   return clean.length === 11;
 }
 
+/*
+ * Convenção de datas do sistema
+ * -----------------------------
+ * Vencimento é data de calendário, não instante. A convenção é gravar sempre a
+ * meia-noite UTC do dia pretendido, e ler esse valor pelas partes UTC.
+ *
+ * O "hoje" com que se compara, porém, é o dia no calendário de Brasília — que
+ * é o dia que o usuário enxerga.
+ *
+ * Sem isso o sistema respondia conforme o fuso de quem executava o código: o
+ * servidor na Vercel roda em UTC e, entre 21h e meia-noite em Brasília, já
+ * estava no dia seguinte. Um alerta de "faltam 7 dias" podia disparar na
+ * véspera, e format_date chegava a exibir datas diferentes para o mesmo
+ * veículo conforme a página renderizasse no servidor ou no navegador.
+ */
+const FUSO_BR = 'America/Sao_Paulo';
+
+/** Número de dias inteiros desde a epoch, no calendário de Brasília. */
+function dia_no_calendario_br(data: Date): number {
+  const iso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSO_BR,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(data);
+
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  return Math.floor(Date.UTC(ano, mes - 1, dia) / 86_400_000);
+}
+
+/** Número de dias inteiros desde a epoch, lendo as partes UTC do valor. */
+function dia_no_calendario_utc(data: Date): number {
+  return Math.floor(
+    Date.UTC(data.getUTCFullYear(), data.getUTCMonth(), data.getUTCDate()) /
+      86_400_000
+  );
+}
+
 // Calcular data de vencimento
 export function calculate_expiry_date(
   type: 'proprio' | 'locado',
   from_date: Date = new Date(),
 ): Date {
   const months = type === 'proprio' ? 12 : 4;
-  const expiry = new Date(from_date);
-  expiry.setMonth(expiry.getMonth() + months);
-  return expiry;
+
+  // Parte do dia em Brasília e devolve meia-noite UTC, conforme a convenção.
+  // Antes carregava a hora corrente, deixando o vencimento com hora arbitrária.
+  const iso = new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSO_BR,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(from_date);
+
+  const [ano, mes, dia] = iso.split('-').map(Number);
+  return new Date(Date.UTC(ano, mes - 1 + months, dia));
 }
 
 // Formatar data
 export function format_date(date: Date | null): string {
   if (!date) return '-';
+
+  // timeZone UTC fixo: o valor guardado ja e a data pretendida em meia-noite
+  // UTC. Sem fixar, servidor e navegador exibiam dias diferentes.
   return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'UTC',
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -94,13 +145,23 @@ export function format_date(date: Date | null): string {
 // Calcular dias até vencimento
 export function days_until_expiry(expiry_date: Date | null): number {
   if (!expiry_date) return -1;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const exp = new Date(expiry_date);
-  exp.setHours(0, 0, 0, 0);
-  return Math.ceil(
-    (exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  return dia_no_calendario_utc(expiry_date) - dia_no_calendario_br(new Date());
+}
+
+/**
+ * Data de hoje em Brasília.
+ *
+ * Diferente de format_date, que lê o valor em UTC porque ali o dado guardado
+ * já é a data pretendida. Aqui o instante é agora, e o dia que interessa é o
+ * de quem está olhando a tela.
+ */
+export function format_data_hoje(): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: FUSO_BR,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date());
 }
 
 // Status de veículo baseado em vencimento

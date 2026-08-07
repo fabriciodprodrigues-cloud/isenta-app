@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { format_date } from '@/lib/utils';
 import {
   Table,
   TableHead,
@@ -245,7 +246,7 @@ export default function GestaoTags() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {tag.expiresAt
-                        ? new Date(tag.expiresAt).toLocaleDateString('pt-BR')
+                        ? format_date(new Date(tag.expiresAt))
                         : '—'}
                     </TableCell>
                     <TableCell>

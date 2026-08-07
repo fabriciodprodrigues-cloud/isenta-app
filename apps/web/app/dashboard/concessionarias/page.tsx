@@ -8,7 +8,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { RequestExemptionModal } from '@/components/RequestExemptionModal';
-import { format_estados } from '@/lib/utils';
+import { format_estados, format_date } from '@/lib/utils';
 import {
   Table,
   TableHead,
@@ -225,7 +225,7 @@ export default function ConcessionariasPage() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {reg.approvedAt
-                          ? new Date(reg.approvedAt).toLocaleDateString('pt-BR')
+                          ? format_date(new Date(reg.approvedAt))
                           : '—'}
                       </TableCell>
                       <TableCell>
