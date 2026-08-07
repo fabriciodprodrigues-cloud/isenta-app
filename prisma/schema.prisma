@@ -152,6 +152,23 @@ model Session {
   @@index([expires])
 }
 
+/// Token de redefinicao de senha.
+///
+/// Guarda o hash do token, nunca o valor em claro: se o banco vazar, os
+/// tokens em transito nao servem para nada. Mesmo raciocinio da coluna de
+/// senha.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model Concessionaire {
   id                  String    @id @default(cuid())
   name                String    @unique

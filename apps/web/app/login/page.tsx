@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { BarrierLogo } from '@/components/BarrierLogo';
 
 export default function LoginPage() {
@@ -109,6 +110,15 @@ export default function LoginPage() {
               {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
+
+          <div className="mt-6 text-center">
+            <Link
+              href="/recuperar-senha"
+              className="text-sm text-slate transition-colors hover:text-paper"
+            >
+              Esqueci minha senha
+            </Link>
+          </div>
         </div>
       </div>
     </div>
