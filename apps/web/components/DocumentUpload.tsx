@@ -28,6 +28,12 @@ const ROTULOS: Record<string, string> = {
 
 const TAMANHO_MAXIMO = 20 * 1024 * 1024;
 
+/**
+ * Teto da rota que passa pela função. A Vercel corta o corpo em ~4,5 MB, então
+ * 4 MB deixa margem para os cabeçalhos e a codificação do multipart.
+ */
+const LIMITE_ROTA_SERVIDOR = 4 * 1024 * 1024;
+
 function formatarTamanho(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
@@ -94,11 +100,52 @@ export function DocumentUpload({ vehicleId, exigeContrato }: DocumentUploadProps
       await carregar();
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : 'Falha no envio.';
-      setErro(mensagem);
+
+      // O envio direto exige BLOB_READ_WRITE_TOKEN no servidor; sem ela a
+      // Vercel não emite o token do cliente. Enquanto isso, arquivos que
+      // cabem no limite da função ainda passam pela rota antiga.
+      const semToken = /client token|token/i.test(mensagem);
+
+      if (semToken && arquivo.size <= LIMITE_ROTA_SERVIDOR) {
+        const enviouPelaRota = await enviarPelaRotaDoServidor(tipo, arquivo);
+        if (enviouPelaRota) {
+          await carregar();
+          setEnviando(null);
+          const input = inputs.current[tipo];
+          if (input) input.value = '';
+          return;
+        }
+      }
+
+      setErro(
+        semToken && arquivo.size > LIMITE_ROTA_SERVIDOR
+          ? `O envio direto não está configurado no servidor, e este arquivo (${formatarTamanho(arquivo.size)}) excede o limite de 4 MB da rota alternativa.`
+          : mensagem
+      );
     } finally {
       setEnviando(null);
       const input = inputs.current[tipo];
       if (input) input.value = '';
+    }
+  }
+
+  /** Caminho antigo: o arquivo trafega pela função, logo cabe até ~4,5 MB. */
+  async function enviarPelaRotaDoServidor(tipo: string, arquivo: File) {
+    const dados = new FormData();
+    dados.append('file', arquivo);
+    dados.append('vehicleId', vehicleId);
+    dados.append('type', tipo);
+
+    try {
+      const resposta = await fetch('/api/documents', { method: 'POST', body: dados });
+      if (resposta.ok) return true;
+
+      const corpo = await resposta.json().catch(() => null);
+      setErro(corpo?.error ?? `Falha no envio (HTTP ${resposta.status})`);
+      return false;
+    } catch {
+      setErro('Falha de conexão ao enviar o arquivo.');
+      return false;
     }
   }
 
