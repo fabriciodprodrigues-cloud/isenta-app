@@ -5,12 +5,31 @@ import { prisma } from './prisma';
 const VALIDADE_MINUTOS = 60;
 
 /**
+ * Convite de primeiro acesso.
+ *
+ * Prazo maior que o de redefinicao: quem esquece a senha esta ali naquele
+ * momento, enquanto o operador convidado pode so abrir o e-mail no dia
+ * seguinte. Expirar em uma hora obrigaria o admin a reenviar o tempo todo.
+ */
+const VALIDADE_CONVITE_HORAS = 72;
+
+/**
  * Gera o token que vai no link e guarda apenas o hash.
  *
  * O valor em claro so existe nesta funcao e no e-mail; nao fica no banco nem
  * em log. Assim um vazamento do banco nao permite redefinir senha de ninguem.
  */
 export async function criarTokenDeReset(userId: string) {
+  const token = await gerarToken(userId, VALIDADE_MINUTOS * 60_000);
+  return { token, validadeMinutos: VALIDADE_MINUTOS };
+}
+
+export async function criarTokenDeConvite(userId: string) {
+  const token = await gerarToken(userId, VALIDADE_CONVITE_HORAS * 3_600_000);
+  return { token, validadeHoras: VALIDADE_CONVITE_HORAS };
+}
+
+async function gerarToken(userId: string, duracaoMs: number) {
   const token = randomBytes(32).toString('base64url');
 
   // Tokens anteriores do mesmo usuario deixam de valer: pedir um novo link
@@ -21,11 +40,11 @@ export async function criarTokenDeReset(userId: string) {
     data: {
       tokenHash: hashDoToken(token),
       userId,
-      expiresAt: new Date(Date.now() + VALIDADE_MINUTOS * 60_000),
+      expiresAt: new Date(Date.now() + duracaoMs),
     },
   });
 
-  return { token, validadeMinutos: VALIDADE_MINUTOS };
+  return token;
 }
 
 function hashDoToken(token: string) {

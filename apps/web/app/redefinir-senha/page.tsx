@@ -158,7 +158,9 @@ export default function RedefinirSenhaPage() {
           <h1 className="font-display text-3xl font-bold text-paper">
             isenta<span className="text-green">.</span>
           </h1>
-          <p className="mt-1 text-sm text-paper-dim">Definir nova senha</p>
+          {/* Neutro: a mesma tela atende a redefinição e o primeiro acesso de
+              um operador convidado, para quem não existe senha "nova". */}
+          <p className="mt-1 text-sm text-paper-dim">Definir senha</p>
         </div>
 
         {/* useSearchParams exige Suspense em componente de cliente no App Router. */}

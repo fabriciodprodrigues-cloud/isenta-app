@@ -186,9 +186,14 @@ export default function GestaoOrgaos() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/dashboard/admin/orgaos/${orgao.id}`}>
+                        {/*
+                          Antes apontava para /dashboard/admin/orgaos/[id], rota
+                          que nunca existiu. Usuários é o que de fato se
+                          administra por órgão hoje.
+                        */}
+                        <Link href={`/dashboard/admin/orgaos/${orgao.id}/usuarios`}>
                           <Button size="sm" variant="secondary">
-                            Ver
+                            Usuários
                           </Button>
                         </Link>
                       </TableCell>
