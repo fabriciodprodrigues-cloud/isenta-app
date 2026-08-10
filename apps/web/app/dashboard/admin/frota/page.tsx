@@ -1,182 +1,158 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { format_plate, get_status_label } from '@/lib/utils';
+
+interface Registro {
+  id: string;
+  status: string;
+  concessionaire?: { name: string } | null;
+}
+
+interface Veiculo {
+  id: string;
+  plate: string;
+  type: string;
+  marca: string | null;
+  modelo: string | null;
+  account: { name: string } | null;
+  registrations: Registro[];
+}
+
+const CORES_STATUS: Record<string, string> = {
+  aprovado: 'bg-green-900/20 text-green-400',
+  aguardando_resposta: 'bg-blue-900/20 text-blue-400',
+  enviado: 'bg-blue-900/20 text-blue-400',
+  recusado: 'bg-red-900/20 text-red-400',
+  rascunho: 'bg-gray-900/20 text-gray-400',
+};
 
 export default function GestaoFrota() {
+  const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
   const [filtro, setFiltro] = useState('');
-  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [filtroStatus, setFiltroStatus] = useState('');
 
-  // Mock data
-  const veiculos = [
-    {
-      id: '1',
-      placa: 'SAO1000',
-      orgao: 'Prefeitura SP',
-      tipo: 'Próprio',
-      categoria: 'Oficial',
-      renavam: '12345678901',
-      cor: 'Branco',
-      marca: 'Toyota',
-      modelo: 'Hiace',
-      anoFab: 2023,
-      concessionarias: [
-        { nome: 'Eco050', status: 'aprovado' },
-        { nome: 'CSG', status: 'pendente' },
-      ],
-    },
-    {
-      id: '2',
-      placa: 'AMB1001',
-      orgao: 'Prefeitura SP',
-      tipo: 'Próprio',
-      categoria: 'Ambulância',
-      renavam: '98765432101',
-      cor: 'Branco',
-      marca: 'Mercedes',
-      modelo: 'Sprinter',
-      anoFab: 2022,
-      concessionarias: [
-        { nome: 'CSG', status: 'aguardando' },
-      ],
-    },
-    {
-      id: '3',
-      placa: 'CBM1002',
-      orgao: 'Prefeitura SP',
-      tipo: 'Locado',
-      categoria: 'Bombeiro',
-      renavam: '11122233344',
-      cor: 'Vermelho',
-      marca: 'Scania',
-      modelo: 'P 360',
-      anoFab: 2021,
-      concessionarias: [
-        { nome: 'Eco050', status: 'rascunho' },
-      ],
-    },
-    {
-      id: '4',
-      placa: 'OTR1003',
-      orgao: 'Prefeitura SP',
-      tipo: 'Próprio',
-      categoria: 'Outro',
-      renavam: '55566677788',
-      cor: 'Preto',
-      marca: 'Volkswagen',
-      modelo: 'Delivery',
-      anoFab: 2023,
-      concessionarias: [],
-    },
-  ];
-
-  const veiculosFiltrados = veiculos.filter(
-    (v) =>
-      v.placa.includes(filtro.toUpperCase()) ||
-      v.orgao.toLowerCase().includes(filtro.toLowerCase())
-  );
-
-  const getStatusColor = (status: string) => {
-    if (status === 'aprovado') return 'bg-green-900/20 text-green-400';
-    if (status === 'pendente') return 'bg-amber-900/20 text-amber-400';
-    if (status === 'aguardando') return 'bg-blue-900/20 text-blue-400';
-    return 'bg-gray-900/20 text-gray-400';
-  };
-
-  const toggleVeiculo = (id: string) => {
-    setSelecionados((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
-
-  const toggleTodos = () => {
-    if (selecionados.length === veiculosFiltrados.length) {
-      setSelecionados([]);
-    } else {
-      setSelecionados(veiculosFiltrados.map((v) => v.id));
+  useEffect(() => {
+    async function carregar() {
+      try {
+        const resposta = await fetch('/api/vehicles');
+        if (resposta.ok) {
+          setVeiculos(await resposta.json());
+        } else {
+          setErro('Não foi possível carregar a frota.');
+        }
+      } catch {
+        setErro('Falha de conexão ao carregar a frota.');
+      } finally {
+        setCarregando(false);
+      }
     }
-  };
+
+    carregar();
+  }, []);
+
+  if (carregando) {
+    return <p className="text-paper-dim">Carregando frota...</p>;
+  }
+
+  if (erro) {
+    return (
+      <div className="rounded border border-red-500/50 bg-red-500/10 p-4 text-red-300">
+        {erro}
+      </div>
+    );
+  }
+
+  const busca = filtro.trim().toLowerCase();
+  const veiculosFiltrados = veiculos.filter(v => {
+    const casaBusca =
+      !busca ||
+      v.plate.toLowerCase().includes(busca) ||
+      (v.account?.name ?? '').toLowerCase().includes(busca);
+
+    const casaStatus =
+      !filtroStatus || v.registrations.some(r => r.status === filtroStatus);
+
+    return casaBusca && casaStatus;
+  });
+
+  const comAprovado = veiculos.filter(v =>
+    v.registrations.some(r => r.status === 'aprovado')
+  ).length;
+
+  const comPendente = veiculos.filter(v =>
+    v.registrations.some(r =>
+      ['rascunho', 'enviado', 'aguardando_resposta'].includes(r.status)
+    )
+  ).length;
+
+  const semCadastro = veiculos.filter(v => v.registrations.length === 0).length;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-paper">Gestão da Frota</h1>
-        <p className="text-paper-dim text-sm mt-1">
+        <p className="mt-1 text-sm text-paper-dim">
           Visualizar todos os veículos e status de cadastro por concessionária
         </p>
       </div>
 
-      {/* Filtros e Ações */}
       <Card>
-        <CardBody className="space-y-4">
-          <div className="flex gap-3 items-center">
+        <CardBody>
+          <div className="flex items-center gap-3">
             <input
               type="text"
               placeholder="Buscar por placa ou órgão..."
               value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-              className="flex-1 px-3 py-2 bg-input border border-border rounded text-paper placeholder:text-paper-dim"
+              onChange={e => setFiltro(e.target.value)}
+              className="flex-1 rounded border border-border bg-input px-3 py-2 text-paper placeholder:text-paper-dim"
             />
-            <select className="px-3 py-2 bg-input border border-border rounded text-paper">
+            <select
+              value={filtroStatus}
+              onChange={e => setFiltroStatus(e.target.value)}
+              className="rounded border border-border bg-input px-3 py-2 text-paper"
+            >
               <option value="">Filtrar por status</option>
               <option value="aprovado">Aprovado</option>
-              <option value="pendente">Pendente</option>
-              <option value="rascunho">Rascunho</option>
+              <option value="aguardando_resposta">Aguardando resposta</option>
+              <option value="enviado">Enviado</option>
+              <option value="rascunho">Não enviado</option>
+              <option value="recusado">Recusado</option>
             </select>
           </div>
-
-          {selecionados.length > 0 && (
-            <div className="flex items-center justify-between p-3 bg-accent/10 border border-accent rounded">
-              <p className="text-sm text-paper">
-                {selecionados.length} veículo(s) selecionado(s)
-              </p>
-              <div className="flex gap-2">
-                <Button size="sm">Cadastrar Selecionados</Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setSelecionados([])}
-                >
-                  Limpar
-                </Button>
-              </div>
-            </div>
-          )}
         </CardBody>
       </Card>
 
-      {/* Tabela */}
       <Card>
         <CardHeader>
           <h2 className="font-semibold text-paper">
-            {veiculosFiltrados.length} Veículos
+            {veiculosFiltrados.length}{' '}
+            {veiculosFiltrados.length === 1 ? 'veículo' : 'veículos'}
           </h2>
         </CardHeader>
         <CardBody>
-          {veiculosFiltrados.length === 0 ? (
-            <p className="text-paper-dim text-center py-8">
-              Nenhum veículo encontrado
+          {veiculos.length === 0 ? (
+            <div className="py-8 text-center">
+              <p className="text-paper-dim">Nenhum veículo cadastrado ainda.</p>
+              <Link href="/dashboard/vehicles/new">
+                <Button className="mt-4">Cadastrar primeiro veículo</Button>
+              </Link>
+            </div>
+          ) : veiculosFiltrados.length === 0 ? (
+            <p className="py-8 text-center text-paper-dim">
+              Nenhum veículo corresponde ao filtro.
             </p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell className="w-12">
-                      <input
-                        type="checkbox"
-                        checked={
-                          selecionados.length === veiculosFiltrados.length &&
-                          veiculosFiltrados.length > 0
-                        }
-                        onChange={toggleTodos}
-                        className="rounded"
-                      />
-                    </TableCell>
                     <TableCell>Placa</TableCell>
                     <TableCell>Órgão</TableCell>
                     <TableCell>Marca/Modelo</TableCell>
@@ -186,51 +162,43 @@ export default function GestaoFrota() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {veiculosFiltrados.map((veiculo) => (
+                  {veiculosFiltrados.map(veiculo => (
                     <TableRow key={veiculo.id}>
-                      <TableCell>
-                        <input
-                          type="checkbox"
-                          checked={selecionados.includes(veiculo.id)}
-                          onChange={() => toggleVeiculo(veiculo.id)}
-                          className="rounded"
-                        />
-                      </TableCell>
                       <TableCell className="font-mono font-bold">
-                        {veiculo.placa}
+                        {format_plate(veiculo.plate)}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {veiculo.orgao}
+                        {veiculo.account?.name ?? '—'}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {veiculo.marca} {veiculo.modelo}
+                        {[veiculo.marca, veiculo.modelo].filter(Boolean).join(' ') || '—'}
                       </TableCell>
                       <TableCell className="text-sm">
-                        {veiculo.tipo === 'Próprio' ? '🚗' : '🚗'}{' '}
-                        {veiculo.tipo}
+                        {veiculo.type === 'locado' ? 'Locado' : 'Próprio'}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-2">
-                          {veiculo.concessionarias.length === 0 ? (
-                            <span className="text-xs text-paper-dim">
-                              Nenhuma
-                            </span>
+                          {veiculo.registrations.length === 0 ? (
+                            <span className="text-xs text-paper-dim">Nenhuma</span>
                           ) : (
-                            veiculo.concessionarias.map((c) => (
+                            veiculo.registrations.map(r => (
                               <span
-                                key={c.nome}
-                                className={`text-xs px-2 py-1 rounded ${getStatusColor(
-                                  c.status
-                                )}`}
+                                key={r.id}
+                                title={get_status_label(r.status)}
+                                className={`rounded px-2 py-1 text-xs ${
+                                  CORES_STATUS[r.status] ?? CORES_STATUS.rascunho
+                                }`}
                               >
-                                {c.nome}
+                                {r.concessionaire?.name ?? 'Concessionária'}
                               </span>
                             ))
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/dashboard/admin/frota/${veiculo.id}`}>
+                        {/* A rota /dashboard/admin/frota/[id] nunca existiu; o
+                            detalhe do veículo mora em /dashboard/vehicles/[id]. */}
+                        <Link href={`/dashboard/vehicles/${veiculo.id}`}>
                           <Button size="sm" variant="secondary">
                             Ver
                           </Button>
@@ -245,59 +213,20 @@ export default function GestaoFrota() {
         </CardBody>
       </Card>
 
-      {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <CardBody className="text-center py-6">
-            <div className="text-3xl font-bold text-accent mb-2">
-              {veiculos.length}
-            </div>
-            <p className="text-paper-dim text-sm">Total de Veículos</p>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody className="text-center py-6">
-            <div className="text-3xl font-bold text-green-400 mb-2">
-              {veiculos.filter((v) =>
-                v.concessionarias.some((c) => c.status === 'aprovado')
-              ).length}
-            </div>
-            <p className="text-paper-dim text-sm">Com Cadastro Aprovado</p>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody className="text-center py-6">
-            <div className="text-3xl font-bold text-amber-400 mb-2">
-              {veiculos.filter((v) =>
-                v.concessionarias.some(
-                  (c) => c.status === 'pendente' || c.status === 'aguardando'
-                )
-              ).length}
-            </div>
-            <p className="text-paper-dim text-sm">Cadastros Pendentes</p>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardBody className="text-center py-6">
-            <div className="text-3xl font-bold text-gray-400 mb-2">
-              {veiculos.filter((v) => v.concessionarias.length === 0).length}
-            </div>
-            <p className="text-paper-dim text-sm">Sem Cadastro</p>
-          </CardBody>
-        </Card>
-      </div>
-
-      {/* Navigation */}
-      <div className="flex gap-3">
-        <Link href="/dashboard/admin">
-          <Button variant="secondary">← Visão Geral</Button>
-        </Link>
-        <Link href="/dashboard/admin/cadastros">
-          <Button variant="secondary">→ Central de Cadastros</Button>
-        </Link>
+        {[
+          { rotulo: 'Total de Veículos', valor: veiculos.length, cor: 'text-accent' },
+          { rotulo: 'Com Cadastro Aprovado', valor: comAprovado, cor: 'text-green-400' },
+          { rotulo: 'Cadastros Pendentes', valor: comPendente, cor: 'text-amber-400' },
+          { rotulo: 'Sem Cadastro', valor: semCadastro, cor: 'text-paper-dim' },
+        ].map(item => (
+          <Card key={item.rotulo}>
+            <CardBody className="py-6 text-center">
+              <div className={`mb-2 text-3xl font-bold ${item.cor}`}>{item.valor}</div>
+              <p className="text-sm text-paper-dim">{item.rotulo}</p>
+            </CardBody>
+          </Card>
+        ))}
       </div>
     </div>
   );

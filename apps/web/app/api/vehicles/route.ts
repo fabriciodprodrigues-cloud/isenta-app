@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
 
     const include: any = {
       account: true,
-      registrations: true,
+      // Com o nome da concessionária: a tela de frota precisa dele para rotular
+      // cada cadastro, e sem isso exibia apenas o status solto.
+      registrations: {
+        include: { concessionaire: { select: { name: true } } },
+      },
       tags: true,
     };
 
