@@ -119,12 +119,12 @@ function Formulario() {
         <input
           type="password"
           required
-          minLength={12}
+          minLength={8}
           value={senha}
           onChange={e => setSenha(e.target.value)}
           className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
         />
-        <p className="mt-1 text-xs text-slate">Mínimo de 12 caracteres.</p>
+        <p className="mt-1 text-xs text-slate">Mínimo de 8 caracteres.</p>
       </div>
 
       <div>
@@ -132,7 +132,7 @@ function Formulario() {
         <input
           type="password"
           required
-          minLength={12}
+          minLength={8}
           value={confirmacao}
           onChange={e => setConfirmacao(e.target.value)}
           className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"

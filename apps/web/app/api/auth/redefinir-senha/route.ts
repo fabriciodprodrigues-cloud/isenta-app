@@ -9,9 +9,7 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.object({
   token: z.string().min(1, 'Token ausente'),
-  senha: z
-    .string()
-    .min(12, 'A senha deve ter ao menos 12 caracteres'),
+  senha: z.string().min(8, 'A senha deve ter ao menos 8 caracteres'),
 });
 
 /** Confere se o link ainda vale, sem consumi-lo — usado ao abrir a tela. */
