@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { upload } from '@vercel/blob/client';
 import { Badge } from '@/components/ui/Badge';
 
 interface Documento {
@@ -24,6 +25,8 @@ const ROTULOS: Record<string, string> = {
   registration: 'Comprovante de Cadastro',
   other: 'Outro',
 };
+
+const TAMANHO_MAXIMO = 20 * 1024 * 1024;
 
 function formatarTamanho(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -59,25 +62,39 @@ export function DocumentUpload({ vehicleId, exigeContrato }: DocumentUploadProps
 
   async function enviar(tipo: string, arquivo: File) {
     setErro('');
+
+    if (arquivo.size > TAMANHO_MAXIMO) {
+      setErro(
+        `Arquivo muito grande: ${formatarTamanho(arquivo.size)}. O limite é 20 MB.`
+      );
+      const input = inputs.current[tipo];
+      if (input) input.value = '';
+      return;
+    }
+
     setEnviando(tipo);
 
-    const dados = new FormData();
-    dados.append('file', arquivo);
-    dados.append('vehicleId', vehicleId);
-    dados.append('type', tipo);
-
     try {
-      const resposta = await fetch('/api/documents', { method: 'POST', body: dados });
+      // Envio direto do navegador para o Blob. Passar o arquivo pela nossa API
+      // esbarrava no limite de ~4,5 MB de corpo das funções da Vercel, que
+      // devolvia 413 antes de o código rodar.
+      await upload(`documentos/${vehicleId}/${tipo}`, arquivo, {
+        access: 'private',
+        handleUploadUrl: '/api/documents/upload',
+        clientPayload: JSON.stringify({
+          vehicleId,
+          type: tipo,
+          fileName: arquivo.name,
+        }),
+      });
 
-      if (!resposta.ok) {
-        const corpo = await resposta.json().catch(() => null);
-        setErro(corpo?.error ?? `Falha no envio (HTTP ${resposta.status})`);
-        return;
-      }
-
+      // O registro é criado pela Vercel ao concluir o envio, o que leva um
+      // instante — daí a espera antes de recarregar a lista.
+      await new Promise(r => setTimeout(r, 1200));
       await carregar();
-    } catch {
-      setErro('Falha de conexão ao enviar o arquivo.');
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : 'Falha no envio.';
+      setErro(mensagem);
     } finally {
       setEnviando(null);
       const input = inputs.current[tipo];
@@ -182,7 +199,7 @@ export function DocumentUpload({ vehicleId, exigeContrato }: DocumentUploadProps
       })}
 
       <p className="text-xs text-slate">
-        PDF, JPG ou PNG, até 10 MB. Os documentos ficam acessíveis apenas a
+        PDF, JPG ou PNG, até 20 MB. Os documentos ficam acessíveis apenas a
         usuários do órgão e são anexados às solicitações de isenção.
       </p>
     </div>
