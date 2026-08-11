@@ -1,8 +1,12 @@
 import nodemailer from 'nodemailer';
 import { get } from '@vercel/blob';
-import { prisma } from './prisma';
+import {
+  montarOficio,
+  assuntoDoOficio,
+  type DadosDoOficio,
+} from './oficio-isencao';
 
-interface AnexoDocumento {
+export interface AnexoDocumento {
   fileName: string;
   /** Pathname do blob na store privada, nao uma url publica. */
   url: string;
@@ -115,151 +119,38 @@ export async function enviarEmail({
   });
 }
 
-function linhaSeTiver(rotulo: string, valor: string | number | null | undefined) {
-  return valor ? `<p><strong>${rotulo}:</strong> ${valor}</p>` : '';
-}
-
-function textoSeTiver(rotulo: string, valor: string | number | null | undefined) {
-  return valor ? `\n- ${rotulo}: ${valor}` : '';
-}
-
-export async function sendExemptionRequestEmail({
-  registrationId,
-  vehiclePlate,
-  concessionaireEmail,
-  concessionaireName,
-  accountName,
-  cnpj,
-  renavam,
-  marca,
-  modelo,
-  cor,
-  anoFabricacao,
-  anoModelo,
-  anexos = [],
-}: SendExemptionRequestEmailProps) {
+/**
+ * Envia o ofício de pedido de isenção para uma concessionária.
+ *
+ * Um ofício cobre toda a frota do órgão naquela concessionária. A resposta da
+ * concessionária vai para o responsável do órgão, não para a plataforma — quem
+ * tem legitimidade para requerer é o órgão, e é com ele que a tratativa segue.
+ */
+export async function enviarOficioDeIsencao({
+  destino,
+  dados,
+  anexos,
+}: {
+  destino: string;
+  dados: DadosDoOficio;
+  anexos: AnexoDocumento[];
+}) {
   const transporter = createEmailTransport();
+  if (!transporter) throw new EmailNaoConfiguradoError();
 
-  // Sem transporte configurado o envio precisa FALHAR. A versao anterior
-  // marcava a solicitacao como "enviado" e retornava true, de modo que o
-  // sistema afirmava ter notificado a concessionaria sem nada ter saido.
-  if (!transporter) {
-    throw new EmailNaoConfiguradoError();
-  }
-
-  const emailBody = `
-Prezados Senhores,
-
-Solicitamos a análise e aprovação de isenção de pedágio para o seguinte veículo:
-
-DADOS DO ÓRGÃO PÚBLICO:
-- Nome: ${accountName}
-- CNPJ: ${cnpj}
-
-DADOS DO VEÍCULO:
-- Placa: ${vehiclePlate}${textoSeTiver('RENAVAM', renavam)}${textoSeTiver('Marca', marca)}${textoSeTiver('Modelo', modelo)}${textoSeTiver('Cor', cor)}${textoSeTiver('Ano de fabricação', anoFabricacao)}${textoSeTiver('Ano do modelo', anoModelo)}
-
-Protocolo de Referência: ${registrationId}
-${anexos.length > 0 ? `\nDocumentação anexada: ${anexos.map(a => a.fileName).join(', ')}\n` : ''}
-Aguardamos retorno com a confirmação de recebimento e análise da solicitação.
-
-Atenciosamente,
-${accountName}
-via Isenta — Plataforma de Gestão de Isenções de Pedágio
-  `.trim();
-
-  const htmlBody = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background-color: #2d5f2e; color: white; padding: 20px; border-radius: 5px 5px 0 0; }
-    .header h1 { margin: 0; font-size: 20px; }
-    .content { background-color: #f9f9f9; padding: 20px; }
-    .section { margin: 20px 0; }
-    .section h2 { font-size: 14px; font-weight: bold; color: #2d5f2e; margin: 10px 0 5px 0; }
-    .section p { margin: 5px 0; }
-    .protocol { background-color: #e8f5e9; padding: 10px; border-left: 4px solid #2d5f2e; margin: 20px 0; }
-    .footer { background-color: #f0f0f0; padding: 15px; border-radius: 0 0 5px 5px; font-size: 12px; color: #666; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Solicitação de Isenção de Pedágio</h1>
-    </div>
-    <div class="content">
-      <p>Prezados Senhores,</p>
-
-      <p>Solicitamos a análise e aprovação de isenção de pedágio para o seguinte veículo:</p>
-
-      <div class="section">
-        <h2>DADOS DO ÓRGÃO PÚBLICO</h2>
-        <p><strong>Nome:</strong> ${accountName}</p>
-        <p><strong>CNPJ:</strong> ${cnpj}</p>
-      </div>
-
-      <div class="section">
-        <h2>DADOS DO VEÍCULO</h2>
-        <p><strong>Placa:</strong> ${vehiclePlate}</p>
-        ${linhaSeTiver('RENAVAM', renavam)}
-        ${linhaSeTiver('Marca', marca)}
-        ${linhaSeTiver('Modelo', modelo)}
-        ${linhaSeTiver('Cor', cor)}
-        ${linhaSeTiver('Ano de fabricação', anoFabricacao)}
-        ${linhaSeTiver('Ano do modelo', anoModelo)}
-      </div>
-
-      <div class="protocol">
-        <p><strong>Protocolo de Referência:</strong> ${registrationId}</p>
-      </div>
-
-      ${
-        anexos.length > 0
-          ? `<div class="section">
-        <h2>DOCUMENTAÇÃO ANEXADA</h2>
-        ${anexos.map(a => `<p>${a.fileName}</p>`).join('\n        ')}
-      </div>`
-          : ''
-      }
-
-      <p>Aguardamos retorno com a confirmação de recebimento e análise da solicitação.</p>
-
-      <p><strong>Atenciosamente,</strong><br/>
-      ${accountName}<br/>
-      via Isenta — Plataforma de Gestão de Isenções de Pedágio</p>
-    </div>
-    <div class="footer">
-      <p>Utilize o protocolo acima para referências futuras sobre esta solicitação.</p>
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
-
+  const { texto, html } = montarOficio(dados);
   const attachments = await baixarAnexos(anexos);
 
   await transporter.sendMail({
     from: process.env.EMAIL_FROM || 'noreply@plataformaisenta.com',
-    to: concessionaireEmail,
-    replyTo: process.env.EMAIL_REPLY_TO || undefined,
-    subject: `Solicitação de Isenção de Pedágio - Veículo ${vehiclePlate} - ${accountName}`,
-    text: emailBody,
-    // Antes ia `<pre>${emailBody}</pre>`: o htmlBody era montado e descartado.
-    html: htmlBody,
+    to: destino,
+    replyTo: dados.orgao.responsibleEmail,
+    subject: assuntoDoOficio(dados.orgao.name),
+    text: texto,
+    html,
     attachments,
   });
 
-  // Só depois do envio bem-sucedido. Se sendMail lancar, a solicitacao
-  // permanece em rascunho e pode ser reenviada.
-  await prisma.concesssionaireRegistration.update({
-    where: { id: registrationId },
-    data: { status: 'enviado', sentAt: new Date() },
-  });
-
-  console.log(`E-mail de isenção enviado para ${concessionaireEmail} (${concessionaireName})`);
-  return true;
+  return { anexosEnviados: attachments.length };
 }
+

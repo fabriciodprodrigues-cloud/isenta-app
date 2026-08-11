@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       // Antes a resposta era sempre "processadas com sucesso", mesmo quando
       // nenhuma solicitacao saia — o resumo agora diz o que de fato ocorreu.
       message:
-        `${resumo.enviados} enviada(s)` +
+        `${resumo.oficios} ofício(s) enviado(s) cobrindo ${resumo.veiculos} veículo(s)` +
         (resumo.documentosFaltando > 0
           ? `, ${resumo.documentosFaltando} aguardando documento`
           : '') +

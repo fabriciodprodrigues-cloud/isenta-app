@@ -55,9 +55,10 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         message:
-          `Solicitação enviada para ${resultado.destino}` +
-          (resultado.anexos > 0 ? ` com ${resultado.anexos} documento(s) anexado(s)` : ''),
+          `Ofício enviado para ${resultado.destino} com ${resultado.veiculos} ` +
+          `veículo(s) e ${resultado.anexos} documento(s) anexado(s)`,
         canal: resultado.canal,
+        veiculos: resultado.veiculos,
       });
     }
 
