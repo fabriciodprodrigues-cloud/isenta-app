@@ -38,6 +38,9 @@ export async function GET(request: Request) {
         canalIsentos: true,
         tipoCanal: true,
         ativoParaCadastro: true,
+        // A tela de admin edita o canal e precisa reexibir a observação; sem
+        // ela, salvar uma alteração apagaria a nota já registrada.
+        observacoes: true,
       },
       orderBy: [
         { regulador: 'asc' },

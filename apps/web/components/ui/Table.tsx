@@ -60,6 +60,8 @@ interface TableCellProps {
   header?: boolean;
   align?: 'left' | 'center' | 'right';
   className?: string;
+  /** Une colunas — usado por linhas que viram formulário de edição. */
+  colSpan?: number;
 }
 
 export function TableCell({
@@ -67,6 +69,7 @@ export function TableCell({
   header = false,
   align = 'left',
   className,
+  colSpan,
 }: TableCellProps) {
   const alignClass = {
     left: 'text-left',
@@ -78,6 +81,7 @@ export function TableCell({
 
   return (
     <Element
+      colSpan={colSpan}
       className={`px-6 py-4 ${alignClass} ${
         header
           ? 'font-medium text-paper-dim text-sm uppercase tracking-wide'

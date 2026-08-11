@@ -15,6 +15,7 @@ interface Concessionaria {
   situacao: string;
   canalIsentos: string | null;
   tipoCanal: string | null;
+  observacoes: string | null;
   ativoParaCadastro: boolean;
 }
 
@@ -32,51 +33,98 @@ const COR_CANAL: Record<string, string> = {
   MANUAL: 'bg-amber-900/20 text-amber-400',
 };
 
+/** Ajuda contextual: o formato esperado muda conforme o tipo de canal. */
+const DICA_DESTINO: Record<string, string> = {
+  EMAIL: 'ex: isentos@concessionaria.com.br',
+  PORTAL_WEB: 'ex: https://portal.concessionaria.com.br/isentos',
+  PORTAL_MAIS_ATENDIMENTO: 'ex: https://concessionaria.com.br/isentos',
+  MANUAL: 'telefone, endereço ou instrução (opcional)',
+};
+
 export default function GestaoConcessionarias() {
   const [lista, setLista] = useState<Concessionaria[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
   const [busca, setBusca] = useState('');
   const [filtroCanal, setFiltroCanal] = useState('');
 
-  useEffect(() => {
-    async function carregar() {
-      try {
-        const resposta = await fetch('/api/concessionaires');
-        if (resposta.ok) {
-          setLista(await resposta.json());
-        } else {
-          setErro('Não foi possível carregar as concessionárias.');
-        }
-      } catch {
-        setErro('Falha de conexão.');
-      } finally {
-        setCarregando(false);
-      }
-    }
+  const [editando, setEditando] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [formTipo, setFormTipo] = useState<string>('');
+  const [formDestino, setFormDestino] = useState('');
+  const [formObs, setFormObs] = useState('');
 
+  async function carregar() {
+    try {
+      const resposta = await fetch('/api/concessionaires');
+      if (resposta.ok) setLista(await resposta.json());
+      else setErro('Não foi possível carregar as concessionárias.');
+    } catch {
+      setErro('Falha de conexão.');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  useEffect(() => {
     carregar();
   }, []);
 
-  const contagens = useMemo(() => {
-    const porCanal = lista.reduce<Record<string, number>>((acc, c) => {
-      const chave = c.tipoCanal ?? 'SEM_CANAL';
-      acc[chave] = (acc[chave] ?? 0) + 1;
-      return acc;
-    }, {});
-    return porCanal;
-  }, [lista]);
+  function abrirEdicao(c: Concessionaria) {
+    setErro('');
+    setAviso('');
+    setEditando(c.id);
+    setFormTipo(c.tipoCanal ?? '');
+    setFormDestino(c.canalIsentos ?? '');
+    setFormObs(c.observacoes ?? '');
+  }
+
+  async function salvar(id: string) {
+    setErro('');
+    setAviso('');
+    setSalvando(true);
+
+    try {
+      const resposta = await fetch(`/api/concessionaires/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tipoCanal: formTipo || null,
+          canalIsentos: formDestino.trim() || null,
+          observacoes: formObs.trim() || null,
+        }),
+      });
+
+      const corpo = await resposta.json().catch(() => null);
+
+      if (!resposta.ok) {
+        setErro(corpo?.error ?? 'Não foi possível salvar.');
+        return;
+      }
+
+      setAviso(`Canal de ${corpo.name} atualizado.`);
+      setEditando(null);
+      await carregar();
+    } catch {
+      setErro('Falha de conexão ao salvar.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  const contagens = useMemo(
+    () =>
+      lista.reduce<Record<string, number>>((acc, c) => {
+        const chave = c.tipoCanal ?? 'SEM_CANAL';
+        acc[chave] = (acc[chave] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [lista]
+  );
 
   if (carregando) {
     return <p className="text-paper-dim">Carregando concessionárias...</p>;
-  }
-
-  if (erro) {
-    return (
-      <div className="rounded border border-red-500/50 bg-red-500/10 p-4 text-red-300">
-        {erro}
-      </div>
-    );
   }
 
   const termo = busca.trim().toLowerCase();
@@ -103,28 +151,28 @@ export default function GestaoConcessionarias() {
         </p>
       </div>
 
+      {erro && (
+        <div className="rounded border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">
+          {erro}
+        </div>
+      )}
+
+      {aviso && (
+        <div className="rounded border border-green/40 bg-green/10 p-3 text-sm text-paper">
+          {aviso}
+        </div>
+      )}
+
       <div className="grid grid-cols-4 gap-4">
         {[
-          {
-            rotulo: 'Automatizáveis por e-mail',
-            valor: contagens.EMAIL ?? 0,
-            cor: 'text-green-400',
-          },
+          { rotulo: 'Automatizáveis por e-mail', valor: contagens.EMAIL ?? 0, cor: 'text-green-400' },
           {
             rotulo: 'Via portal',
             valor: (contagens.PORTAL_WEB ?? 0) + (contagens.PORTAL_MAIS_ATENDIMENTO ?? 0),
             cor: 'text-blue-400',
           },
-          {
-            rotulo: 'Tratativa manual',
-            valor: contagens.MANUAL ?? 0,
-            cor: 'text-amber-400',
-          },
-          {
-            rotulo: 'Canal não mapeado',
-            valor: contagens.SEM_CANAL ?? 0,
-            cor: 'text-paper-dim',
-          },
+          { rotulo: 'Tratativa manual', valor: contagens.MANUAL ?? 0, cor: 'text-amber-400' },
+          { rotulo: 'Canal não mapeado', valor: contagens.SEM_CANAL ?? 0, cor: 'text-paper-dim' },
         ].map(item => (
           <Card key={item.rotulo}>
             <CardBody className="py-6 text-center">
@@ -177,43 +225,129 @@ export default function GestaoConcessionarias() {
                   <TableCell>Estados</TableCell>
                   <TableCell>Canal</TableCell>
                   <TableCell>Destino</TableCell>
+                  <TableCell>Ação</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filtradas.map(c => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="text-sm text-paper-dim">
-                      {c.regulador}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {format_estados(c.estados) || '—'}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`rounded px-2 py-1 text-xs ${
-                          COR_CANAL[c.tipoCanal ?? ''] ?? 'bg-gray-900/20 text-gray-400'
-                        }`}
-                      >
-                        {ROTULO_CANAL[c.tipoCanal ?? ''] ?? 'Não mapeado'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate text-sm text-paper-dim">
-                      {c.canalIsentos ?? '—'}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {filtradas.map(c =>
+                  editando === c.id ? (
+                    <TableRow key={c.id}>
+                      <TableCell colSpan={6}>
+                        <div className="space-y-3 rounded border border-green/30 bg-ink-700/40 p-4">
+                          <p className="font-medium text-paper">{c.name}</p>
+
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="mb-1 block text-xs text-paper-dim">
+                                Tipo de canal
+                              </label>
+                              <select
+                                value={formTipo}
+                                onChange={e => setFormTipo(e.target.value)}
+                                className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                              >
+                                <option value="">Não mapeado</option>
+                                <option value="EMAIL">E-mail (envio automático)</option>
+                                <option value="PORTAL_WEB">Portal web</option>
+                                <option value="PORTAL_MAIS_ATENDIMENTO">
+                                  Portal +Atendimento
+                                </option>
+                                <option value="MANUAL">Manual</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="mb-1 block text-xs text-paper-dim">
+                                Destino
+                              </label>
+                              <input
+                                type="text"
+                                value={formDestino}
+                                onChange={e => setFormDestino(e.target.value)}
+                                placeholder={DICA_DESTINO[formTipo] ?? 'e-mail ou endereço do portal'}
+                                className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs text-paper-dim">
+                              Observações
+                            </label>
+                            <input
+                              type="text"
+                              value={formObs}
+                              onChange={e => setFormObs(e.target.value)}
+                              placeholder="ex: também aceita formulário no site"
+                              className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                            />
+                          </div>
+
+                          {formTipo === 'EMAIL' && (
+                            <p className="text-xs text-green">
+                              Com canal de e-mail, as solicitações desta concessionária
+                              passam a ser enviadas automaticamente.
+                            </p>
+                          )}
+
+                          <div className="flex gap-2">
+                            <Button onClick={() => salvar(c.id)} disabled={salvando} size="sm">
+                              {salvando ? 'Salvando...' : 'Salvar'}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setEditando(null)}
+                              disabled={salvando}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    <TableRow key={c.id}>
+                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell className="text-sm text-paper-dim">{c.regulador}</TableCell>
+                      <TableCell className="text-sm">
+                        {format_estados(c.estados) || '—'}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`rounded px-2 py-1 text-xs ${
+                            COR_CANAL[c.tipoCanal ?? ''] ?? 'bg-gray-900/20 text-gray-400'
+                          }`}
+                        >
+                          {ROTULO_CANAL[c.tipoCanal ?? ''] ?? 'Não mapeado'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-xs text-sm text-paper-dim">
+                        <span className="block truncate" title={c.observacoes ?? undefined}>
+                          {c.canalIsentos ?? '—'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          onClick={() => abrirEdicao(c)}
+                          className="rounded px-2 py-1 text-sm text-green hover:bg-green/10"
+                        >
+                          Editar
+                        </button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                )}
               </TableBody>
             </Table>
           </div>
         </CardBody>
       </Card>
 
-      <div className="flex gap-3">
-        <Link href="/dashboard/admin">
-          <Button variant="secondary">Voltar</Button>
-        </Link>
-      </div>
+      <Link href="/dashboard/admin">
+        <Button variant="secondary">Voltar</Button>
+      </Link>
     </div>
   );
 }
