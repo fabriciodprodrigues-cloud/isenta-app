@@ -186,16 +186,18 @@ export default function GestaoOrgaos() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        {/*
-                          Antes apontava para /dashboard/admin/orgaos/[id], rota
-                          que nunca existiu. Usuários é o que de fato se
-                          administra por órgão hoje.
-                        */}
-                        <Link href={`/dashboard/admin/orgaos/${orgao.id}/usuarios`}>
-                          <Button size="sm" variant="secondary">
-                            Usuários
-                          </Button>
-                        </Link>
+                        <div className="flex justify-end gap-2">
+                          <Link href={`/dashboard/admin/orgaos/${orgao.id}/onboarding`}>
+                            <Button size="sm" variant="secondary">
+                              Identidade
+                            </Button>
+                          </Link>
+                          <Link href={`/dashboard/admin/orgaos/${orgao.id}/usuarios`}>
+                            <Button size="sm" variant="secondary">
+                              Usuários
+                            </Button>
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -53,7 +53,10 @@ model Account {
   emailIsencao       String?  // ex: isencao@orgao.gov.br
   metodoAcessoEmail  String?  // DELEGACAO | CREDENCIAL | ENCAMINHAMENTO
   emailCredencialRef String?  // referência ao segredo no cofre, nunca a senha
-  emailVerificado    Boolean  @default(false) // confirmado por envio real
+  emailVerificado    Boolean  @default(false) // confirmado por clique real na caixa
+  // Hash do token de verificação — o valor em claro só vai no e-mail.
+  emailVerifHash     String?
+  emailVerifExpira   DateTime?
 
   // --- Papel timbrado ---
   timbreUrl          String?  // pathname do arquivo no Blob privado
