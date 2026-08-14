@@ -39,14 +39,27 @@ export interface OrgaoDoOficio {
   responsibleName: string;
   responsibleEmail: string;
   responsiblePhone: string;
+  /** Cargo de quem assina — um ofício sem cargo não identifica a autoridade. */
+  responsibleRole: string | null;
+  cabecalhoTexto: string | null;
+  cidadeEmissao: string | null;
 }
 
 export interface DadosDoOficio {
+  /** Número do ofício no formato NNN/AAAA, sequencial por órgão. */
+  numeroOficio: string;
   protocolo: string;
   orgao: OrgaoDoOficio;
   concessionariaNome: string;
   veiculos: VeiculoDoOficio[];
   anexos: string[];
+  /**
+   * Papel timbrado do órgão, já em data URI.
+   *
+   * Vai embutido porque cliente de e-mail bloqueia imagem remota por padrão —
+   * um timbre por URL apareceria como espaço vazio na maioria das caixas.
+   */
+  timbreDataUri?: string | null;
 }
 
 const ROTULO_CATEGORIA: Record<string, string> = {
@@ -91,13 +104,22 @@ export function assuntoDoOficio(orgaoNome: string) {
 }
 
 export function montarOficio(dados: DadosDoOficio): { texto: string; html: string } {
-  const { orgao, concessionariaNome, veiculos, anexos, protocolo } = dados;
+  const {
+    orgao,
+    concessionariaNome,
+    veiculos,
+    anexos,
+    protocolo,
+    numeroOficio,
+    timbreDataUri,
+  } = dados;
 
   const proprios = veiculos.filter(v => v.type !== 'locado');
   const locados = veiculos.filter(v => v.type === 'locado');
 
   const razao = orgao.razaoSocial || orgao.name;
   const dataHoje = format_date(new Date());
+  const cidadeFecho = orgao.cidadeEmissao || `${orgao.city}/${orgao.state}`;
 
   // ---------- versão em texto ----------
 
@@ -125,12 +147,12 @@ export function montarOficio(dados: DadosDoOficio): { texto: string; html: strin
   }
 
   const texto = `
-${razao}
+${orgao.cabecalhoTexto ? orgao.cabecalhoTexto + '\n' : ''}${razao}
 CNPJ ${orgao.cnpj}
 ${enderecoCompleto(orgao)}
 
-Protocolo ${protocolo}
-${orgao.city}/${orgao.state}, ${dataHoje}
+OFÍCIO Nº ${numeroOficio}
+${cidadeFecho}, ${dataHoje}
 
 À
 ${concessionariaNome}
@@ -158,13 +180,12 @@ esclarecimentos ou apresentar documentação complementar que se faça necessár
 Atenciosamente,
 
 ${orgao.responsibleName}
-Responsável pela frota — ${razao}
+${orgao.responsibleRole || 'Responsável pela frota'} — ${razao}
 ${orgao.responsiblePhone} · ${orgao.responsibleEmail}
 
 ---
-Mensagem encaminhada pela plataforma Isenta em nome do órgão interessado.
+Ofício nº ${numeroOficio} · Protocolo ${protocolo}
 Respostas a este e-mail são recebidas pelo responsável indicado acima.
-Para referência futura, utilize o protocolo ${protocolo}.
 `.trim();
 
   // ---------- versão em HTML ----------
@@ -208,16 +229,25 @@ Para referência futura, utilize o protocolo ${protocolo}.
 <body style="margin:0;padding:0;background:#f2f5f3;">
   <div style="max-width:720px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.65;color:#151a17;padding:40px 44px;">
 
+    ${
+      timbreDataUri
+        ? `<div style="text-align:center;margin-bottom:20px;">
+      <img src="${timbreDataUri}" alt="${esc(razao)}" style="max-width:100%;max-height:130px;">
+    </div>`
+        : ''
+    }
+
     <div style="border-bottom:2px solid #2d5f2e;padding-bottom:14px;margin-bottom:26px;">
       <table role="presentation" style="width:100%;border-collapse:collapse;">
         <tr>
           <td style="vertical-align:bottom;">
-            <div style="font-family:Georgia,serif;font-size:21px;color:#2d5f2e;">isenta</div>
-            <div style="font-size:12px;color:#8a968f;">Gestão de Isenções de Pedágio</div>
+            ${orgao.cabecalhoTexto ? `<div style="font-size:12px;color:#5c6862;">${esc(orgao.cabecalhoTexto)}</div>` : ''}
+            <div style="font-family:Georgia,serif;font-size:19px;color:#151a17;">${esc(razao)}</div>
+            <div style="font-size:12px;color:#8a968f;">CNPJ ${esc(orgao.cnpj)}</div>
           </td>
           <td style="vertical-align:bottom;text-align:right;font-size:12px;color:#5c6862;">
-            Protocolo ${esc(protocolo)}<br>
-            ${esc(orgao.city)}/${esc(orgao.state)}, ${esc(dataHoje)}
+            <strong style="color:#151a17;">OFÍCIO Nº ${esc(numeroOficio)}</strong><br>
+            ${esc(cidadeFecho)}, ${esc(dataHoje)}
           </td>
         </tr>
       </table>
@@ -269,14 +299,13 @@ Para referência futura, utilize o protocolo ${protocolo}.
 
     <div style="margin-top:26px;padding-top:16px;border-top:1px solid #d8e0db;font-size:13.5px;">
       <div style="font-weight:700;">${esc(orgao.responsibleName)}</div>
-      <div style="color:#5c6862;">Responsável pela frota — ${esc(razao)}</div>
+      <div style="color:#5c6862;">${esc(orgao.responsibleRole || 'Responsável pela frota')} — ${esc(razao)}</div>
       <div style="color:#5c6862;">${esc(orgao.responsiblePhone)} · ${esc(orgao.responsibleEmail)}</div>
     </div>
 
     <div style="margin-top:26px;padding-top:14px;border-top:1px solid #d8e0db;font-size:11.5px;color:#8a968f;line-height:1.5;">
-      Mensagem encaminhada pela plataforma Isenta em nome do órgão interessado.
+      Ofício nº ${esc(numeroOficio)} · Protocolo ${esc(protocolo)}<br>
       Respostas a este e-mail são recebidas pelo responsável indicado acima.
-      Para referência futura, utilize o protocolo ${esc(protocolo)}.
     </div>
 
   </div>

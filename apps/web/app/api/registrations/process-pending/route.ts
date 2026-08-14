@@ -27,6 +27,9 @@ export async function POST(request: Request) {
         (resumo.documentosFaltando > 0
           ? `, ${resumo.documentosFaltando} aguardando documento`
           : '') +
+        (resumo.identidadeIncompleta > 0
+          ? `, ${resumo.identidadeIncompleta} com identidade do órgão incompleta`
+          : '') +
         (resumo.naoAutomatizaveis > 0
           ? `, ${resumo.naoAutomatizaveis} sem canal automatizável`
           : '') +

@@ -63,11 +63,22 @@ export async function POST(request: Request) {
     }
 
     // 428: a requisição está correta, mas falta uma pré-condição do lado do
-    // usuário — anexar o documento. Distinguir de 422 ajuda a interface a
-    // orientar em vez de apenas informar falha.
+    // usuário — anexar o documento ou concluir a identidade do órgão.
+    // Distinguir de 422 ajuda a interface a orientar em vez de só falhar.
     if (resultado.status === 'documento_faltando') {
       return NextResponse.json(
         { success: false, error: resultado.motivo },
+        { status: 428 }
+      );
+    }
+
+    if (resultado.status === 'identidade_incompleta') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: resultado.motivo,
+          pendencias: resultado.pendencias,
+        },
         { status: 428 }
       );
     }

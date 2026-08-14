@@ -1,6 +1,8 @@
+import { get } from '@vercel/blob';
 import { prisma } from './prisma';
 import { enviarOficioDeIsencao, type AnexoDocumento } from './email-service';
 import type { VeiculoDoOficio } from './oficio-isencao';
+import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
 
 /**
  * Resultado do envio de um ofício.
@@ -19,6 +21,7 @@ export type ResultadoEnvio =
     }
   | { status: 'nao_automatizavel'; motivo: string }
   | { status: 'documento_faltando'; motivo: string }
+  | { status: 'identidade_incompleta'; motivo: string; pendencias: Pendencia[] }
   | { status: 'ignorado'; motivo: string };
 
 /**
@@ -29,6 +32,32 @@ export type ResultadoEnvio =
  */
 function montarProtocolo(idMaisAntigo: string, criadoEm: Date) {
   return `ISN-${criadoEm.getUTCFullYear()}-${idMaisAntigo.slice(-6).toUpperCase()}`;
+}
+
+/**
+ * Carrega o papel timbrado e devolve como data URI.
+ *
+ * Embutido no HTML porque cliente de e-mail bloqueia imagem remota por padrão:
+ * um timbre servido por URL apareceria como espaço vazio na maioria das caixas,
+ * justamente no topo do documento.
+ */
+async function carregarTimbre(pathname: string): Promise<string | null> {
+  try {
+    const resultado = await get(pathname, { access: 'private' });
+
+    if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+      console.error(`Timbre indisponível no Blob: ${pathname}`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await new Response(resultado.stream).arrayBuffer());
+    const tipo = resultado.blob.contentType ?? 'image/png';
+
+    return `data:${tipo};base64,${buffer.toString('base64')}`;
+  } catch (erro) {
+    console.error('Falha ao carregar o papel timbrado:', erro);
+    return null;
+  }
 }
 
 /**
@@ -60,6 +89,41 @@ export async function processRegistration(
     return {
       status: 'ignorado',
       motivo: `Solicitação já está em "${referencia.status}"`,
+    };
+  }
+
+  // Antes de qualquer coisa: o órgão precisa ter identidade própria de envio.
+  // Nenhuma solicitação sai em nome da Isenta — a checagem vem aqui, e não na
+  // interface, para que a regra valha por construção e não por disciplina.
+  const orgaoIdentidade = await prisma.account.findUnique({
+    where: { id: referencia.vehicle.accountId },
+    select: {
+      name: true,
+      emailIsencao: true,
+      metodoAcessoEmail: true,
+      emailVerificado: true,
+      timbreUrl: true,
+      metodoAssinatura: true,
+      responsibleName: true,
+      responsibleRole: true,
+      cidadeEmissao: true,
+      autorizacao: { select: { ativo: true, validoAte: true } },
+    },
+  });
+
+  if (!orgaoIdentidade) {
+    throw new Error('Órgão não encontrado');
+  }
+
+  const identidade = avaliarIdentidadeEnvio(orgaoIdentidade);
+
+  if (!identidade.completa) {
+    return {
+      status: 'identidade_incompleta',
+      motivo:
+        `${orgaoIdentidade.name} ainda não pode enviar solicitações: ` +
+        identidade.pendencias.map(p => p.descricao).join('; '),
+      pendencias: identidade.pendencias,
     };
   }
 
@@ -142,6 +206,21 @@ export async function processRegistration(
   const orgao = grupo[0].vehicle.account;
   const protocolo = montarProtocolo(grupo[0].id, grupo[0].createdAt);
 
+  // Reserva o número do ofício de forma atômica. Um increment do Prisma evita
+  // que dois envios simultâneos do mesmo órgão recebam o mesmo número.
+  const { proximoNumeroOficio } = await prisma.account.update({
+    where: { id: orgao.id },
+    data: { proximoNumeroOficio: { increment: 1 } },
+    select: { proximoNumeroOficio: true },
+  });
+
+  const sequencial = proximoNumeroOficio - 1;
+  const numeroOficio = `${String(sequencial).padStart(3, '0')}/${new Date().getUTCFullYear()}`;
+
+  const timbreDataUri = orgao.timbreUrl
+    ? await carregarTimbre(orgao.timbreUrl)
+    : null;
+
   const veiculos: VeiculoDoOficio[] = grupo.map(r => ({
     plate: r.vehicle.plate,
     renavam: r.vehicle.renavam,
@@ -176,10 +255,12 @@ export async function processRegistration(
     destino: concessionaria.canalIsentos,
     anexos,
     dados: {
+      numeroOficio,
       protocolo,
       concessionariaNome: concessionaria.name,
       veiculos,
       anexos: nomesAnexos,
+      timbreDataUri,
       orgao: {
         name: orgao.name,
         razaoSocial: orgao.razaoSocial,
@@ -193,6 +274,9 @@ export async function processRegistration(
         responsibleName: orgao.responsibleName,
         responsibleEmail: orgao.responsibleEmail,
         responsiblePhone: orgao.responsiblePhone,
+        responsibleRole: orgao.responsibleRole,
+        cabecalhoTexto: orgao.cabecalhoTexto,
+        cidadeEmissao: orgao.cidadeEmissao,
       },
     },
   });
@@ -218,6 +302,7 @@ export interface ResumoLote {
   veiculos: number;
   naoAutomatizaveis: number;
   documentosFaltando: number;
+  identidadeIncompleta: number;
   ignorados: number;
   erros: number;
   detalhes: string[];
@@ -248,6 +333,7 @@ export async function processPendingRegistrations(
     veiculos: 0,
     naoAutomatizaveis: 0,
     documentosFaltando: 0,
+    identidadeIncompleta: 0,
     ignorados: 0,
     erros: 0,
     detalhes: [],
@@ -273,6 +359,9 @@ export async function processPendingRegistrations(
         resumo.detalhes.push(resultado.motivo);
       } else if (resultado.status === 'documento_faltando') {
         resumo.documentosFaltando++;
+        resumo.detalhes.push(resultado.motivo);
+      } else if (resultado.status === 'identidade_incompleta') {
+        resumo.identidadeIncompleta++;
         resumo.detalhes.push(resultado.motivo);
       } else {
         resumo.ignorados++;

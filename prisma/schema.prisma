@@ -46,15 +46,59 @@ model Account {
   complemento        String?  // opcional em Motiva
   bairro             String?  // obrigatório em Motiva
 
+  // --- Identidade de envio ---
+  // Toda solicitação sai na identidade do órgão, nunca na da Isenta. Os campos
+  // abaixo são o que torna isso possível, e a ausência de qualquer um deles
+  // bloqueia o envio (ver identidade-envio.ts).
+  emailIsencao       String?  // ex: isencao@orgao.gov.br
+  metodoAcessoEmail  String?  // DELEGACAO | CREDENCIAL | ENCAMINHAMENTO
+  emailCredencialRef String?  // referência ao segredo no cofre, nunca a senha
+  emailVerificado    Boolean  @default(false) // confirmado por envio real
+
+  // --- Papel timbrado ---
+  timbreUrl          String?  // pathname do arquivo no Blob privado
+  cabecalhoTexto     String?  // ex: nome da secretaria
+  cidadeEmissao      String?  // usada no fecho do ofício
+
+  // --- Assinatura ---
+  metodoAssinatura   String?  // GOVBR_ICP | ELETRONICA_INTERNA
+  responsibleRole    String?  // cargo de quem assina
+  assinaturaRef      String?  // referência ao fluxo de assinatura no cofre
+
+  // Numeração de ofício é por órgão, no formato NNN/AAAA.
+  proximoNumeroOficio Int     @default(1)
+
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  users     User[]
-  vehicles  Vehicle[]
-  alerts    Alert[]
+  users        User[]
+  vehicles     Vehicle[]
+  alerts       Alert[]
+  autorizacao  TermoAutorizacao?
 
   @@index([cnpj])
   @@index([status])
+}
+
+/// Termo que autoriza a Isenta a agir em nome do órgão.
+///
+/// Sem ele ativo, nenhum envio ocorre: operar a caixa de e-mail e os portais de
+/// um órgão público exige respaldo documental explícito.
+model TermoAutorizacao {
+  id         String    @id @default(cuid())
+  accountId  String    @unique
+  account    Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  arquivoUrl String?   // pathname do termo assinado no Blob privado
+  poderes    String[]  // ENVIAR_EMAIL_NOME_ORGAO | OPERAR_PORTAIS_NOME_ORGAO
+  assinadoEm DateTime?
+  validoAte  DateTime?
+  ativo      Boolean   @default(false)
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([ativo])
 }
 
 model Vehicle {
