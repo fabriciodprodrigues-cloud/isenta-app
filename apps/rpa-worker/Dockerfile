@@ -1,7 +1,10 @@
 # Imagem oficial do Playwright: já traz Chromium e as bibliotecas de sistema
 # que ele exige. Instalar isso numa imagem Node comum é possível, mas exige
 # dezenas de pacotes do apt e quebra a cada atualização do navegador.
-FROM mcr.microsoft.com/playwright:v1.62.1-jammy
+# Sem sufixo de distro: as variantes (-jammy, -noble) mudam a cada release do
+# Playwright, e uma tag inexistente derruba o build. A tag simples sempre
+# aponta para a distro padrão daquela versão.
+FROM mcr.microsoft.com/playwright:v1.62.1
 
 WORKDIR /app
 
