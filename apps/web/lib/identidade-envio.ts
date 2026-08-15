@@ -38,11 +38,22 @@ export const ROTULO_PODER: Record<string, string> = {
   OPERAR_PORTAIS_NOME_ORGAO: 'Operar portais em nome do órgão',
 };
 
+/**
+ * Métodos que efetivamente permitem enviar como o órgão.
+ *
+ * ENCAMINHAMENTO fica de fora: ele redireciona as respostas para nós, mas não
+ * dá capacidade de envio. Um órgão configurado só assim jamais despacharia um
+ * ofício, e aceitá-lo aqui faria o painel prometer o que não se cumpre.
+ */
+const METODOS_QUE_ENVIAM = ['DELEGACAO', 'CREDENCIAL'];
+
 /** O que a checagem precisa saber. Aceita o registro do Prisma direto. */
 export interface OrgaoParaChecagem {
   emailIsencao: string | null;
   metodoAcessoEmail: string | null;
   emailVerificado: boolean;
+  /** Presença da credencial cifrada — o conteúdo não interessa aqui. */
+  emailCredencialCifrada?: string | null;
   timbreUrl: string | null;
   metodoAssinatura: string | null;
   responsibleName: string | null;
@@ -88,6 +99,31 @@ export function avaliarIdentidadeEnvio(
     pendencias.push({
       campo: 'metodoAcessoEmail',
       descricao: 'Método de acesso à caixa do órgão não definido',
+      passo: 3,
+    });
+  } else if (!METODOS_QUE_ENVIAM.includes(orgao.metodoAcessoEmail)) {
+    pendencias.push({
+      campo: 'metodoAcessoEmail',
+      descricao:
+        'Encaminhamento só recebe respostas; para enviar os ofícios é preciso delegação ou credencial da caixa',
+      passo: 3,
+    });
+  } else if (
+    orgao.metodoAcessoEmail === 'CREDENCIAL' &&
+    !orgao.emailCredencialCifrada
+  ) {
+    // Sem isto o painel diria "pronto para operar" e o envio falharia depois,
+    // porque é a credencial que dá capacidade de envio, não o método escolhido.
+    pendencias.push({
+      campo: 'emailCredencialCifrada',
+      descricao: 'Credencial SMTP da caixa de isenção ainda não cadastrada',
+      passo: 3,
+    });
+  } else if (orgao.metodoAcessoEmail === 'DELEGACAO') {
+    pendencias.push({
+      campo: 'metodoAcessoEmail',
+      descricao:
+        'Delegação por OAuth ainda não está implementada; use credencial da caixa por ora',
       passo: 3,
     });
   }
@@ -172,6 +208,7 @@ export const SELECT_IDENTIDADE = {
   emailIsencao: true,
   metodoAcessoEmail: true,
   emailVerificado: true,
+  emailCredencialCifrada: true,
   timbreUrl: true,
   metodoAssinatura: true,
   responsibleName: true,

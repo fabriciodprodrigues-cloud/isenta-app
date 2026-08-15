@@ -59,6 +59,8 @@ export async function GET(
       emailIsencao: true,
       metodoAcessoEmail: true,
       emailVerificado: true,
+      // Só a presença importa aqui; o conteúdo cifrado nunca sai desta rota.
+      emailCredencialCifrada: true,
       timbreUrl: true,
       cabecalhoTexto: true,
       cidadeEmissao: true,
@@ -81,10 +83,16 @@ export async function GET(
     return NextResponse.json({ error: 'Órgão não encontrado' }, { status: 404 });
   }
 
-  // emailCredencialRef e assinaturaRef ficam de fora de propósito: são
-  // ponteiros para segredos e não têm uso na tela.
+  // O texto cifrado alimenta a checagem mas não vai para o navegador: mesmo
+  // cifrado, é material de segredo e não tem uso na tela — a situação da
+  // credencial vem por /identidade/credencial, que devolve só o resumo.
+  const { emailCredencialCifrada, ...orgaoParaCliente } = orgao;
+
   return NextResponse.json({
-    orgao,
+    orgao: {
+      ...orgaoParaCliente,
+      credencialConfigurada: Boolean(emailCredencialCifrada),
+    },
     identidade: avaliarIdentidadeEnvio(orgao),
   });
 }
@@ -129,6 +137,7 @@ export async function PATCH(
         emailIsencao: true,
         metodoAcessoEmail: true,
         emailVerificado: true,
+        emailCredencialCifrada: true,
         timbreUrl: true,
         cabecalhoTexto: true,
         cidadeEmissao: true,
@@ -139,8 +148,13 @@ export async function PATCH(
       },
     });
 
+    const { emailCredencialCifrada, ...orgaoParaCliente } = atualizado;
+
     return NextResponse.json({
-      orgao: atualizado,
+      orgao: {
+        ...orgaoParaCliente,
+        credencialConfigurada: Boolean(emailCredencialCifrada),
+      },
       identidade: avaliarIdentidadeEnvio(atualizado),
       avisoEmailReverificar: trocouEmail,
     });
