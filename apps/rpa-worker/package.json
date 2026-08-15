@@ -1,0 +1,17 @@
+{
+  "name": "@isenta/rpa-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Robô que preenche os portais das concessionárias. Roda fora da Vercel: precisa de um navegador de verdade, que serverless não sustenta.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "uma-vez": "node src/index.js --uma-vez",
+    "postinstall": "playwright install --with-deps chromium"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.1",
+    "@vercel/blob": "^2.7.0",
+    "playwright": "^1.62.1"
+  }
+}

@@ -81,9 +81,38 @@ model Account {
   vehicles     Vehicle[]
   alerts       Alert[]
   autorizacao  TermoAutorizacao?
+  portais      PortalCredencial[]
 
   @@index([cnpj])
   @@index([status])
+}
+
+/// Acesso do órgão a um portal de concessionária.
+///
+/// A conta no portal é do órgão, criada uma vez pela equipe — o cadastro exige
+/// código enviado por e-mail, o que inviabiliza automatizar essa etapa e não
+/// compensa, já que ocorre uma única vez.
+///
+/// Um registro por par órgão + portal: o mesmo portal atende várias
+/// concessionárias (o da Motiva cobre oito), então a chave é o portal, não a
+/// concessionária.
+model PortalCredencial {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  /// Identificador do portal, ex.: CCR_MOTIVA.
+  portal    String
+  /// E-mail da conta, guardado em claro por ser identificador, não segredo.
+  usuario   String
+  /// Senha cifrada em AES-256-GCM (lib/cofre.ts).
+  senhaCifrada String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([accountId, portal])
+  @@index([portal])
 }
 
 /// Termo que autoriza a Isenta a agir em nome do órgão.
@@ -162,6 +191,18 @@ model ConcesssionaireRegistration {
   sentAt            DateTime?
   approvedAt        DateTime?
   rejectionReason   String?
+
+  // --- Execução pelo robô de portal ---
+  /// Quantas vezes o robô já tentou. Serve para desistir depois de N falhas
+  /// em vez de repetir indefinidamente contra um portal que mudou.
+  rpaTentativas     Int      @default(0)
+  rpaUltimoErro     String?
+  /// Capturas de tela de cada etapa, no Blob. São a única forma de auditar o
+  /// que o robô viu quando algo deu errado.
+  rpaCapturas       String[]
+  rpaExecutadoEm    DateTime?
+  /// Preenchido quando o robô precisa de decisão humana antes de prosseguir.
+  rpaAguardando     String?
 
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
