@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import {
   ROTULO_METODO_EMAIL,
   ROTULO_ASSINATURA,
@@ -56,6 +57,10 @@ const PASSOS = [
   'Papel timbrado',
   'Assinatura',
   'Autorização',
+  // Fora dos seis da especificação, e opcional de propósito: um órgão que só
+  // lida com concessionárias de canal por e-mail não precisa de conta em
+  // portal nenhum. Por isso não entra nas pendências de identidade.
+  'Portais',
 ];
 
 export default function OnboardingOrgao() {
@@ -332,6 +337,7 @@ export default function OnboardingOrgao() {
               onSalvar={salvarAutorizacao}
             />
           )}
+          {passo === 7 && <PassoPortais accountId={accountId} />}
         </CardBody>
       </Card>
 
@@ -927,6 +933,265 @@ function PassoAssinatura({
       >
         {salvando ? 'Salvando...' : 'Salvar'}
       </Button>
+    </div>
+  );
+}
+
+interface DefinicaoPortal {
+  chave: string;
+  nome: string;
+  url: string;
+  concessionarias: string[];
+  automatizado: boolean;
+  instrucaoConta: string;
+}
+
+interface CredencialPortal {
+  id: string;
+  portal: string;
+  usuario: string;
+  updatedAt: string;
+}
+
+function PassoPortais({ accountId }: { accountId: string }) {
+  const [portais, setPortais] = useState<DefinicaoPortal[]>([]);
+  const [credenciais, setCredenciais] = useState<CredencialPortal[]>([]);
+  const [cofreOk, setCofreOk] = useState(true);
+  const [carregando, setCarregando] = useState(true);
+
+  const [editando, setEditando] = useState<string | null>(null);
+  const [usuario, setUsuario] = useState('');
+  const [senha, setSenha] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [aviso, setAviso] = useState('');
+
+  async function carregar() {
+    try {
+      const resposta = await fetch(`/api/accounts/${accountId}/portais`);
+      if (!resposta.ok) {
+        setErro('Não foi possível carregar os portais.');
+        return;
+      }
+      const dados = await resposta.json();
+      setPortais(dados.portais);
+      setCredenciais(dados.credenciais);
+      setCofreOk(dados.cofre !== false);
+    } catch {
+      setErro('Falha de conexão.');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
+
+  function abrirEdicao(chave: string) {
+    const atual = credenciais.find(c => c.portal === chave);
+    setEditando(chave);
+    setUsuario(atual?.usuario ?? '');
+    setSenha('');
+    setErro('');
+    setAviso('');
+  }
+
+  async function salvar(chave: string) {
+    setErro('');
+    setAviso('');
+    setSalvando(true);
+
+    try {
+      const resposta = await fetch(`/api/accounts/${accountId}/portais`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ portal: chave, usuario, senha: senha || undefined }),
+      });
+
+      const corpo = await resposta.json().catch(() => null);
+
+      if (!resposta.ok) {
+        setErro(corpo?.error ?? 'Não foi possível salvar.');
+        return;
+      }
+
+      setAviso(corpo?.aviso ?? 'Credencial guardada.');
+      setEditando(null);
+      setSenha('');
+      await carregar();
+    } catch {
+      setErro('Falha de conexão.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function remover(chave: string) {
+    if (!confirm('Remover a credencial deste portal?')) return;
+
+    await fetch(`/api/accounts/${accountId}/portais?portal=${chave}`, {
+      method: 'DELETE',
+    });
+    await carregar();
+  }
+
+  if (carregando) return <p className="text-paper-dim">Carregando portais...</p>;
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-paper-dim">
+        Concessionárias que só aceitam solicitação por portal exigem uma conta
+        do órgão no site delas. Este passo é opcional: um órgão que só lida com
+        canais por e-mail não precisa dele.
+      </p>
+
+      {!cofreOk && (
+        <div className="rounded border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">
+          O cofre de segredos não está configurado no servidor (ENCRYPTION_KEY
+          ausente).
+        </div>
+      )}
+
+      {erro && (
+        <div className="rounded border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">
+          {erro}
+        </div>
+      )}
+      {aviso && (
+        <div className="rounded border border-green/40 bg-green/10 p-3 text-sm text-paper">
+          {aviso}
+        </div>
+      )}
+
+      {portais.map(portal => {
+        const credencial = credenciais.find(c => c.portal === portal.chave);
+        const aberto = editando === portal.chave;
+
+        return (
+          <div
+            key={portal.chave}
+            className="space-y-3 rounded-lg border border-white/10 bg-ink-700/40 p-4"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="font-medium text-paper">{portal.nome}</p>
+                <p className="mt-1 text-xs text-paper-dim">
+                  Atende: {portal.concessionarias.join(', ')}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+                {!portal.automatizado && (
+                  <Badge variant="default" size="sm">
+                    Robô ainda não cobre
+                  </Badge>
+                )}
+                {credencial ? (
+                  <Badge variant="success" size="sm">
+                    Conta cadastrada
+                  </Badge>
+                ) : (
+                  <Badge variant="default" size="sm">
+                    Sem conta
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {credencial && !aberto && (
+              <p className="text-sm text-green">{credencial.usuario}</p>
+            )}
+
+            {aberto ? (
+              <div className="space-y-3">
+                <div className="rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-paper-dim">
+                  {portal.instrucaoConta}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs text-paper-dim">
+                      E-mail da conta no portal
+                    </label>
+                    <input
+                      type="email"
+                      value={usuario}
+                      onChange={e => setUsuario(e.target.value)}
+                      className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-paper-dim">
+                      Senha {credencial && '(em branco mantém a atual)'}
+                    </label>
+                    <input
+                      type="password"
+                      value={senha}
+                      onChange={e => setSenha(e.target.value)}
+                      autoComplete="new-password"
+                      className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                    />
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate">
+                  A senha é cifrada e não volta a ser exibida. Ela não é testada
+                  agora: fazer login de verificação a cada salvamento arriscaria
+                  bloquear a conta do órgão por tentativas repetidas — o robô
+                  reporta a falha na primeira execução.
+                </p>
+
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    disabled={salvando || !cofreOk}
+                    onClick={() => salvar(portal.chave)}
+                  >
+                    {salvando ? 'Salvando...' : 'Guardar credencial'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setEditando(null)}
+                    disabled={salvando}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => abrirEdicao(portal.chave)}
+                >
+                  {credencial ? 'Alterar' : 'Cadastrar conta'}
+                </Button>
+                {credencial && (
+                  <button
+                    type="button"
+                    onClick={() => remover(portal.chave)}
+                    className="rounded px-2 py-1 text-sm text-slate hover:bg-ink-700"
+                  >
+                    Remover
+                  </button>
+                )}
+                <a
+                  href={portal.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded px-2 py-1 text-sm text-green hover:bg-green/10"
+                >
+                  Abrir portal
+                </a>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
