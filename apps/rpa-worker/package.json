@@ -15,6 +15,7 @@
   "dependencies": {
     "@prisma/client": "5.22.0",
     "@vercel/blob": "^2.7.0",
+    "imapflow": "1.0.194",
     "playwright": "1.62.1"
   },
   "devDependencies": {

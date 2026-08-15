@@ -3,8 +3,8 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypt
 /**
  * Cofre de segredos da aplicação.
  *
- * Guarda credenciais de terceiros — hoje, o acesso SMTP à caixa institucional
- * de cada órgão. São senhas de órgão público: gravá-las em texto plano no banco
+ * Guarda credenciais de terceiros — hoje, o acesso à caixa institucional de
+ * cada órgão. São senhas de órgão público: gravá-las em texto plano no banco
  * significaria que qualquer vazamento, backup mal guardado ou consulta ao
  * Postgres entrega acesso à caixa oficial de uma prefeitura ou câmara.
  *
@@ -74,13 +74,25 @@ export function abrir<T>(cifrado: string): T {
   return JSON.parse(aberto.toString('utf8')) as T;
 }
 
-/** Credenciais SMTP da caixa institucional do órgão. */
+/**
+ * Credenciais da caixa institucional do órgão.
+ *
+ * Um único usuário e senha cobrem envio e leitura, porque é a mesma conta de
+ * e-mail — só as coordenadas de servidor mudam entre um protocolo e outro.
+ *
+ * Os campos de IMAP são opcionais: um órgão que só envia ofícios por e-mail não
+ * precisa de leitura. Ela existe para os portais, que confirmam cadastro e
+ * solicitação por código ou link enviados à caixa.
+ */
 export interface CredencialSmtp {
   host: string;
   port: number;
   secure: boolean;
   user: string;
   pass: string;
+  imapHost?: string;
+  imapPort?: number;
+  imapSeguro?: boolean;
 }
 
 /**
@@ -95,5 +107,9 @@ export function resumoDaCredencial(credencial: CredencialSmtp) {
     secure: credencial.secure,
     user: credencial.user,
     senhaDefinida: Boolean(credencial.pass),
+    imapHost: credencial.imapHost ?? null,
+    imapPort: credencial.imapPort ?? null,
+    imapSeguro: credencial.imapSeguro ?? null,
+    leituraConfigurada: Boolean(credencial.imapHost),
   };
 }

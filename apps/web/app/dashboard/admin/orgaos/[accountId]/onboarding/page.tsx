@@ -408,6 +408,10 @@ interface ResumoCredencial {
   secure: boolean;
   user: string;
   senhaDefinida: boolean;
+  imapHost: string | null;
+  imapPort: number | null;
+  imapSeguro: boolean | null;
+  leituraConfigurada: boolean;
 }
 
 /**
@@ -418,34 +422,45 @@ interface ResumoCredencial {
  */
 const PROVEDORES: Record<
   string,
-  { rotulo: string; host: string; port: number; secure: boolean; nota?: string }
+  {
+    rotulo: string;
+    host: string;
+    port: number;
+    secure: boolean;
+    imapHost: string;
+    nota?: string;
+  }
 > = {
   google: {
     rotulo: 'Google Workspace / Gmail',
     host: 'smtp.gmail.com',
     port: 587,
     secure: false,
-    nota: 'Com verificação em duas etapas ativa, é preciso gerar uma "senha de app" — a senha da conta não funciona no SMTP.',
+    imapHost: 'imap.gmail.com',
+    nota: 'Com verificação em duas etapas ativa, é preciso gerar uma "senha de app" — a senha da conta não funciona no SMTP nem no IMAP.',
   },
   microsoft: {
     rotulo: 'Microsoft 365 / Outlook',
     host: 'smtp.office365.com',
     port: 587,
     secure: false,
-    nota: 'O administrador precisa manter a autenticação SMTP habilitada para a caixa; ela vem desativada por padrão em muitos tenants.',
+    imapHost: 'outlook.office365.com',
+    nota: 'O administrador precisa manter a autenticação SMTP e IMAP habilitada para a caixa; ambas vêm desativadas por padrão em muitos tenants.',
   },
   locaweb: {
     rotulo: 'Locaweb',
     host: 'email-ssl.com.br',
     port: 465,
     secure: true,
+    imapHost: 'imap.email-ssl.com.br',
   },
   outro: {
     rotulo: 'Outro / servidor próprio',
     host: '',
     port: 587,
     secure: false,
-    nota: 'Peça ao TI o servidor de saída, a porta e se usa SSL/TLS direto.',
+    imapHost: '',
+    nota: 'Peça ao TI o servidor de saída, a porta, se usa SSL/TLS direto e o servidor de entrada (IMAP).',
   },
 };
 
@@ -472,6 +487,9 @@ function PassoEmail({
   const [seguro, setSeguro] = useState(false);
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
+  const [imapHost, setImapHost] = useState('');
+  const [imapPorta, setImapPorta] = useState('993');
+  const [imapSeguro, setImapSeguro] = useState(true);
   const [testando, setTestando] = useState(false);
   const [erroSmtp, setErroSmtp] = useState('');
   const [okSmtp, setOkSmtp] = useState('');
@@ -485,6 +503,7 @@ function PassoEmail({
     if (preset.host) setHost(preset.host);
     setPorta(String(preset.port));
     setSeguro(preset.secure);
+    if (preset.imapHost) setImapHost(preset.imapHost);
 
     // O usuário do SMTP costuma ser a própria caixa de isenção.
     if (!usuario && email) setUsuario(email);
@@ -503,6 +522,11 @@ function PassoEmail({
       setPorta(String(dados.credencial.port));
       setSeguro(dados.credencial.secure);
       setUsuario(dados.credencial.user);
+      if (dados.credencial.imapHost) {
+        setImapHost(dados.credencial.imapHost);
+        setImapPorta(String(dados.credencial.imapPort ?? 993));
+        setImapSeguro(dados.credencial.imapSeguro ?? true);
+      }
     }
   }
 
@@ -528,6 +552,9 @@ function PassoEmail({
             secure: seguro,
             user: usuario,
             pass: senha || undefined,
+            imapHost: imapHost || undefined,
+            imapPort: imapHost ? Number(imapPorta) : undefined,
+            imapSeguro: imapHost ? imapSeguro : undefined,
           }),
         }
       );
@@ -733,6 +760,67 @@ function PassoEmail({
                 autoComplete="new-password"
                 className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
               />
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded border border-white/10 bg-ink-700/60 p-3">
+            <div>
+              <p className="text-sm font-medium text-paper">
+                Leitura da caixa (IMAP) — opcional
+              </p>
+              <p className="mt-1 text-xs text-paper-dim">
+                Necessária apenas para os portais, que confirmam cadastro e
+                solicitação por código de seis dígitos ou link enviados por
+                e-mail. Sem isso o robô para no meio do fluxo e alguém precisa
+                completar à mão. Quem só envia ofício por e-mail pode deixar em
+                branco.
+              </p>
+              <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-paper-dim">
+                Use uma caixa <strong className="text-paper">dedicada à
+                isenção</strong>. A credencial de envio só permite enviar; esta
+                permite ler tudo o que chegar na conta.
+              </p>
+            </div>
+
+            {credencial?.leituraConfigurada && (
+              <p className="text-sm text-green">
+                Leitura configurada: {credencial.imapHost}:{credencial.imapPort}
+              </p>
+            )}
+
+            <div className="grid grid-cols-4 gap-3">
+              <div className="col-span-2">
+                <label className="mb-1 block text-xs text-paper-dim">
+                  Servidor de entrada
+                </label>
+                <input
+                  type="text"
+                  value={imapHost}
+                  onChange={e => setImapHost(e.target.value)}
+                  placeholder="imap.orgao.gov.br"
+                  className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-paper-dim">Porta</label>
+                <input
+                  type="number"
+                  value={imapPorta}
+                  onChange={e => setImapPorta(e.target.value)}
+                  className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                />
+              </div>
+              <div className="flex items-end">
+                <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-paper">
+                  <input
+                    type="checkbox"
+                    checked={imapSeguro}
+                    onChange={e => setImapSeguro(e.target.checked)}
+                    className="h-4 w-4 rounded accent-green"
+                  />
+                  TLS direto
+                </label>
+              </div>
             </div>
           </div>
 

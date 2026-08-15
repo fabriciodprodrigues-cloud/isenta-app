@@ -11,19 +11,29 @@ import {
   CofreNaoConfiguradoError,
   type CredencialSmtp,
 } from '@/lib/cofre';
+import { testarLeituraDaCaixa } from '@/lib/caixa-entrada';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
 
-const schema = z.object({
-  host: z.string().min(3, 'Informe o servidor SMTP'),
-  port: z.number().int().min(1).max(65535),
-  secure: z.boolean(),
-  user: z.string().min(3, 'Informe o usuário'),
-  // Opcional na edição: em branco mantém a senha já guardada, para que ajustar
-  // a porta não obrigue a redigitar a senha.
-  pass: z.string().optional(),
-});
+// .strict() de proposito: sem ele, um campo que o formulario manda mas o schema
+// nao declara e descartado em silencio e a rota devolve 200 com o dado pela
+// metade. Ja aconteceu tres vezes neste projeto.
+const schema = z
+  .object({
+    host: z.string().min(3, 'Informe o servidor SMTP'),
+    port: z.number().int().min(1).max(65535),
+    secure: z.boolean(),
+    user: z.string().min(3, 'Informe o usuário'),
+    // Opcional na edição: em branco mantém a senha já guardada, para que ajustar
+    // a porta não obrigue a redigitar a senha.
+    pass: z.string().optional(),
+    // Leitura da caixa. Opcional: só quem usa portal precisa.
+    imapHost: z.string().optional(),
+    imapPort: z.number().int().min(1).max(65535).optional(),
+    imapSeguro: z.boolean().optional(),
+  })
+  .strict();
 
 /** Situação da credencial, sem jamais devolver a senha. */
 export async function GET(
@@ -97,12 +107,19 @@ export async function PUT(
       senha = abrir<CredencialSmtp>(orgao.emailCredencialCifrada).pass;
     }
 
+    const imapHost = dados.imapHost?.trim() || undefined;
+
     const credencial: CredencialSmtp = {
       host: dados.host.trim(),
       port: dados.port,
       secure: dados.secure,
       user: dados.user.trim(),
       pass: senha,
+      imapHost,
+      // Sem host não há o que conectar; guardar porta solta só confundiria a
+      // tela depois.
+      imapPort: imapHost ? (dados.imapPort ?? 993) : undefined,
+      imapSeguro: imapHost ? (dados.imapSeguro ?? true) : undefined,
     };
 
     // Testa antes de guardar. Aceitar sem verificar significaria descobrir que
@@ -128,6 +145,22 @@ export async function PUT(
         },
         { status: 400 }
       );
+    }
+
+    // Mesma razão do teste de SMTP acima: uma senha de IMAP errada só apareceria
+    // quando o robô travasse esperando um código que ele nunca conseguiria ler,
+    // e o erro pareceria ser do portal.
+    if (credencial.imapHost) {
+      const erroImap = await testarLeituraDaCaixa(credencial);
+      if (erroImap) {
+        return NextResponse.json(
+          {
+            error: 'Não foi possível ler a caixa com essas credenciais.',
+            detalhe: erroImap,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     await prisma.account.update({
