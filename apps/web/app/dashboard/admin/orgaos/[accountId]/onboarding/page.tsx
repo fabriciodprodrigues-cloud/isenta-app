@@ -404,6 +404,45 @@ interface ResumoCredencial {
   senhaDefinida: boolean;
 }
 
+/**
+ * Atalhos para os provedores mais comuns em órgãos públicos.
+ *
+ * São ponto de partida, não verdade absoluta: alguns órgãos usam servidor
+ * próprio ou porta alternativa. O teste de conexão é que confirma.
+ */
+const PROVEDORES: Record<
+  string,
+  { rotulo: string; host: string; port: number; secure: boolean; nota?: string }
+> = {
+  google: {
+    rotulo: 'Google Workspace / Gmail',
+    host: 'smtp.gmail.com',
+    port: 587,
+    secure: false,
+    nota: 'Com verificação em duas etapas ativa, é preciso gerar uma "senha de app" — a senha da conta não funciona no SMTP.',
+  },
+  microsoft: {
+    rotulo: 'Microsoft 365 / Outlook',
+    host: 'smtp.office365.com',
+    port: 587,
+    secure: false,
+    nota: 'O administrador precisa manter a autenticação SMTP habilitada para a caixa; ela vem desativada por padrão em muitos tenants.',
+  },
+  locaweb: {
+    rotulo: 'Locaweb',
+    host: 'email-ssl.com.br',
+    port: 465,
+    secure: true,
+  },
+  outro: {
+    rotulo: 'Outro / servidor próprio',
+    host: '',
+    port: 587,
+    secure: false,
+    nota: 'Peça ao TI o servidor de saída, a porta e se usa SSL/TLS direto.',
+  },
+};
+
 function PassoEmail({
   orgao,
   accountId,
@@ -430,6 +469,20 @@ function PassoEmail({
   const [testando, setTestando] = useState(false);
   const [erroSmtp, setErroSmtp] = useState('');
   const [okSmtp, setOkSmtp] = useState('');
+  const [provedor, setProvedor] = useState('');
+
+  function aplicarProvedor(chave: string) {
+    setProvedor(chave);
+    const preset = PROVEDORES[chave];
+    if (!preset) return;
+
+    if (preset.host) setHost(preset.host);
+    setPorta(String(preset.port));
+    setSeguro(preset.secure);
+
+    // O usuário do SMTP costuma ser a própria caixa de isenção.
+    if (!usuario && email) setUsuario(email);
+  }
 
   async function carregarCredencial() {
     const resposta = await fetch(
@@ -595,6 +648,29 @@ function PassoEmail({
               {credencial.secure ? ' (TLS)' : ''}
             </p>
           )}
+
+          <div>
+            <label className="mb-1 block text-xs text-paper-dim">
+              Provedor de e-mail do órgão
+            </label>
+            <select
+              value={provedor}
+              onChange={e => aplicarProvedor(e.target.value)}
+              className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+            >
+              <option value="">Selecione para preencher automaticamente</option>
+              {Object.entries(PROVEDORES).map(([chave, p]) => (
+                <option key={chave} value={chave}>
+                  {p.rotulo}
+                </option>
+              ))}
+            </select>
+            {provedor && PROVEDORES[provedor]?.nota && (
+              <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-paper-dim">
+                {PROVEDORES[provedor].nota}
+              </p>
+            )}
+          </div>
 
           <div className="grid grid-cols-4 gap-3">
             <div className="col-span-2">
