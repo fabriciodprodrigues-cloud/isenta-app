@@ -5,6 +5,7 @@ import {
   assuntoDoOficio,
   type DadosDoOficio,
 } from './oficio-isencao';
+import type { CredencialSmtp } from './cofre';
 
 export interface AnexoDocumento {
   fileName: string;
@@ -119,30 +120,58 @@ export async function enviarEmail({
   });
 }
 
+export class RemetenteDoOrgaoAusenteError extends Error {
+  constructor(orgao: string) {
+    super(
+      `${orgao} não tem credencial da caixa institucional configurada. ` +
+        'Nenhuma solicitação sai em nome da Isenta.'
+    );
+    this.name = 'RemetenteDoOrgaoAusenteError';
+  }
+}
+
 /**
  * Envia o ofício de pedido de isenção para uma concessionária.
  *
- * Um ofício cobre toda a frota do órgão naquela concessionária. A resposta da
- * concessionária vai para o responsável do órgão, não para a plataforma — quem
- * tem legitimidade para requerer é o órgão, e é com ele que a tratativa segue.
+ * O envio usa o SMTP da caixa institucional do órgão, e não o da Isenta. Além
+ * de atender à regra de que nada sai em nome da plataforma, isso resolve
+ * autenticação de domínio sem nenhuma mudança de DNS: a mensagem parte da
+ * infraestrutura do próprio órgão e por isso passa pelo SPF e DKIM dele.
+ *
+ * Sem credencial do órgão o envio falha — não há caminho alternativo, de
+ * propósito.
  */
 export async function enviarOficioDeIsencao({
   destino,
   dados,
   anexos,
+  remetente,
 }: {
   destino: string;
   dados: DadosDoOficio;
   anexos: AnexoDocumento[];
+  remetente: CredencialSmtp | null;
 }) {
-  const transporter = createEmailTransport();
-  if (!transporter) throw new EmailNaoConfiguradoError();
+  if (!remetente) {
+    throw new RemetenteDoOrgaoAusenteError(dados.orgao.name);
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: remetente.host,
+    port: remetente.port,
+    secure: remetente.secure,
+    auth: { user: remetente.user, pass: remetente.pass },
+  });
 
   const { texto, html } = montarOficio(dados);
   const attachments = await baixarAnexos(anexos);
 
+  const razao = dados.orgao.razaoSocial || dados.orgao.name;
+
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM || 'noreply@plataformaisenta.com',
+    // O remetente é a própria caixa autenticada. Divergir daqui costuma ser
+    // rejeitado pelo servidor ou marcado como falsificação.
+    from: `"${razao}" <${remetente.user}>`,
     to: destino,
     replyTo: dados.orgao.responsibleEmail,
     subject: assuntoDoOficio(dados.orgao.name),
@@ -151,6 +180,6 @@ export async function enviarOficioDeIsencao({
     attachments,
   });
 
-  return { anexosEnviados: attachments.length };
+  return { anexosEnviados: attachments.length, remetenteUsado: remetente.user };
 }
 

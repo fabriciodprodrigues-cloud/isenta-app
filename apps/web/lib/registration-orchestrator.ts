@@ -3,6 +3,7 @@ import { prisma } from './prisma';
 import { enviarOficioDeIsencao, type AnexoDocumento } from './email-service';
 import type { VeiculoDoOficio } from './oficio-isencao';
 import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
+import { abrir, type CredencialSmtp } from './cofre';
 
 /**
  * Resultado do envio de um ofício.
@@ -102,6 +103,7 @@ export async function processRegistration(
       emailIsencao: true,
       metodoAcessoEmail: true,
       emailVerificado: true,
+      emailCredencialCifrada: true,
       timbreUrl: true,
       metodoAssinatura: true,
       responsibleName: true,
@@ -251,8 +253,36 @@ export async function processRegistration(
     }
   }
 
+  // Credencial da caixa do órgão. Sem ela o envio falha: nada sai em nome da
+  // Isenta, e não existe caminho alternativo.
+  let remetente: CredencialSmtp | null = null;
+  if (orgaoIdentidade.emailCredencialCifrada) {
+    try {
+      remetente = abrir<CredencialSmtp>(orgaoIdentidade.emailCredencialCifrada);
+    } catch (erro) {
+      console.error('Credencial do órgão ilegível:', erro);
+    }
+  }
+
+  if (!remetente) {
+    return {
+      status: 'identidade_incompleta',
+      motivo:
+        `${orgaoIdentidade.name} não tem a credencial da caixa institucional ` +
+        'configurada, e nenhuma solicitação sai em nome da Isenta.',
+      pendencias: [
+        {
+          campo: 'emailCredencialCifrada',
+          descricao: 'Credencial SMTP da caixa de isenção não configurada',
+          passo: 3,
+        },
+      ],
+    };
+  }
+
   const { anexosEnviados } = await enviarOficioDeIsencao({
     destino: concessionaria.canalIsentos,
+    remetente,
     anexos,
     dados: {
       numeroOficio,

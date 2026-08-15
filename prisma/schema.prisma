@@ -52,7 +52,10 @@ model Account {
   // bloqueia o envio (ver identidade-envio.ts).
   emailIsencao       String?  // ex: isencao@orgao.gov.br
   metodoAcessoEmail  String?  // DELEGACAO | CREDENCIAL | ENCAMINHAMENTO
-  emailCredencialRef String?  // referência ao segredo no cofre, nunca a senha
+  emailCredencialRef String?  // reservado para ponteiro de cofre externo
+  // Credencial SMTP da caixa do órgão, cifrada em AES-256-GCM (lib/cofre.ts).
+  // Nunca a senha em texto plano.
+  emailCredencialCifrada String?
   emailVerificado    Boolean  @default(false) // confirmado por clique real na caixa
   // Hash do token de verificação — o valor em claro só vai no e-mail.
   emailVerifHash     String?

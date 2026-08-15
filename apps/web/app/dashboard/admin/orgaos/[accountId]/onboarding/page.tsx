@@ -306,6 +306,7 @@ export default function OnboardingOrgao() {
           {passo === 3 && (
             <PassoEmail
               orgao={orgao}
+              accountId={accountId}
               salvando={salvando}
               onSalvar={salvar}
               onVerificar={enviarVerificacao}
@@ -395,19 +396,100 @@ function PassoEndereco({ orgao }: { orgao: Orgao }) {
   );
 }
 
+interface ResumoCredencial {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  senhaDefinida: boolean;
+}
+
 function PassoEmail({
   orgao,
+  accountId,
   salvando,
   onSalvar,
   onVerificar,
 }: {
   orgao: Orgao;
+  accountId: string;
   salvando: boolean;
   onSalvar: (campos: Record<string, unknown>) => Promise<boolean>;
   onVerificar: () => void;
 }) {
   const [email, setEmail] = useState(orgao.emailIsencao ?? '');
   const [metodo, setMetodo] = useState(orgao.metodoAcessoEmail ?? '');
+
+  const [credencial, setCredencial] = useState<ResumoCredencial | null>(null);
+  const [cofreOk, setCofreOk] = useState(true);
+  const [host, setHost] = useState('');
+  const [porta, setPorta] = useState('587');
+  const [seguro, setSeguro] = useState(false);
+  const [usuario, setUsuario] = useState('');
+  const [senha, setSenha] = useState('');
+  const [testando, setTestando] = useState(false);
+  const [erroSmtp, setErroSmtp] = useState('');
+  const [okSmtp, setOkSmtp] = useState('');
+
+  async function carregarCredencial() {
+    const resposta = await fetch(
+      `/api/accounts/${accountId}/identidade/credencial`
+    );
+    if (!resposta.ok) return;
+    const dados = await resposta.json();
+    setCofreOk(dados.cofre !== false);
+    if (dados.configurada && dados.credencial) {
+      setCredencial(dados.credencial);
+      setHost(dados.credencial.host);
+      setPorta(String(dados.credencial.port));
+      setSeguro(dados.credencial.secure);
+      setUsuario(dados.credencial.user);
+    }
+  }
+
+  useEffect(() => {
+    carregarCredencial();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountId]);
+
+  async function salvarCredencial() {
+    setErroSmtp('');
+    setOkSmtp('');
+    setTestando(true);
+
+    try {
+      const resposta = await fetch(
+        `/api/accounts/${accountId}/identidade/credencial`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            host,
+            port: Number(porta),
+            secure: seguro,
+            user: usuario,
+            pass: senha || undefined,
+          }),
+        }
+      );
+
+      const corpo = await resposta.json().catch(() => null);
+
+      if (resposta.ok) {
+        setOkSmtp(corpo?.message ?? 'Credencial guardada.');
+        setSenha('');
+        await carregarCredencial();
+      } else {
+        setErroSmtp(
+          corpo?.detalhe ? `${corpo.error} ${corpo.detalhe}` : corpo?.error ?? 'Falhou.'
+        );
+      }
+    } catch {
+      setErroSmtp('Falha de conexão.');
+    } finally {
+      setTestando(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -487,6 +569,113 @@ function PassoEmail({
           {orgao.emailVerificado ? 'Verificar novamente' : 'Enviar verificação'}
         </Button>
       </div>
+
+      {metodo === 'CREDENCIAL' && (
+        <div className="space-y-4 rounded border border-white/10 bg-ink-700/40 p-4">
+          <div>
+            <p className="font-medium text-paper">Credencial SMTP da caixa</p>
+            <p className="mt-1 text-sm text-paper-dim">
+              É por aqui que os ofícios sairão. Como a mensagem parte do servidor
+              do próprio órgão, ela passa pelo SPF e DKIM do domínio deles — não
+              é preciso alterar DNS.
+            </p>
+          </div>
+
+          {!cofreOk && (
+            <div className="rounded border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">
+              O cofre de segredos não está configurado no servidor
+              (ENCRYPTION_KEY ausente). Sem ele a senha não pode ser guardada com
+              segurança.
+            </div>
+          )}
+
+          {credencial && (
+            <p className="text-sm text-green">
+              Configurada: {credencial.user} em {credencial.host}:{credencial.port}
+              {credencial.secure ? ' (TLS)' : ''}
+            </p>
+          )}
+
+          <div className="grid grid-cols-4 gap-3">
+            <div className="col-span-2">
+              <label className="mb-1 block text-xs text-paper-dim">Servidor</label>
+              <input
+                type="text"
+                value={host}
+                onChange={e => setHost(e.target.value)}
+                placeholder="smtp.orgao.gov.br"
+                className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-paper-dim">Porta</label>
+              <input
+                type="number"
+                value={porta}
+                onChange={e => setPorta(e.target.value)}
+                className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+              />
+            </div>
+            <div className="flex items-end">
+              <label className="flex cursor-pointer items-center gap-2 pb-2 text-sm text-paper">
+                <input
+                  type="checkbox"
+                  checked={seguro}
+                  onChange={e => setSeguro(e.target.checked)}
+                  className="h-4 w-4 rounded accent-green"
+                />
+                TLS direto
+              </label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-paper-dim">Usuário</label>
+              <input
+                type="text"
+                value={usuario}
+                onChange={e => setUsuario(e.target.value)}
+                placeholder="isencao@orgao.gov.br"
+                className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-paper-dim">
+                Senha {credencial?.senhaDefinida && '(em branco mantém a atual)'}
+              </label>
+              <input
+                type="password"
+                value={senha}
+                onChange={e => setSenha(e.target.value)}
+                autoComplete="new-password"
+                className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+              />
+            </div>
+          </div>
+
+          {erroSmtp && (
+            <div className="rounded border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">
+              {erroSmtp}
+            </div>
+          )}
+          {okSmtp && (
+            <div className="rounded border border-green/40 bg-green/10 p-3 text-sm text-paper">
+              {okSmtp}
+            </div>
+          )}
+
+          <div>
+            <Button disabled={testando || !cofreOk} onClick={salvarCredencial}>
+              {testando ? 'Testando conexão...' : 'Testar e guardar'}
+            </Button>
+            <p className="mt-2 text-xs text-slate">
+              A conexão é testada antes de guardar. A senha é cifrada e não volta
+              a ser exibida — nem para você.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
