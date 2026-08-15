@@ -7,11 +7,17 @@
   "scripts": {
     "start": "node src/index.js",
     "uma-vez": "node src/index.js --uma-vez",
-    "postinstall": "playwright install --with-deps chromium"
+    "prisma:generate": "prisma generate --schema=../../prisma/schema.prisma"
+  },
+  "prisma": {
+    "schema": "../../prisma/schema.prisma"
   },
   "dependencies": {
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "5.22.0",
     "@vercel/blob": "^2.7.0",
-    "playwright": "^1.62.1"
+    "playwright": "1.62.1"
+  },
+  "devDependencies": {
+    "prisma": "5.22.0"
   }
 }

@@ -42,12 +42,30 @@ node src/index.js             # contínuo
 
 ## Publicando no Railway
 
-1. Novo projeto → Deploy from GitHub → este repositório
-2. Root Directory: `apps/rpa-worker`
-3. Start Command: `node src/index.js`
-4. Adicionar as três variáveis acima
+O deploy usa o `Dockerfile` desta pasta, com o **contexto na raiz do
+repositório** — o schema do Prisma vive lá fora e precisa ser alcançado.
 
-O `postinstall` baixa o Chromium com as dependências de sistema.
+1. Novo projeto → Deploy from GitHub → este repositório
+2. Em Settings → Build:
+   - Builder: **Dockerfile**
+   - Dockerfile Path: `apps/rpa-worker/Dockerfile`
+   - Root Directory: deixar **vazio** (a raiz do repositório)
+3. Em Variables, adicionar as três variáveis acima
+4. Deploy
+
+A imagem base é a oficial do Playwright, que já traz Chromium e as bibliotecas
+de sistema. Instalar isso numa imagem Node comum exigiria dezenas de pacotes do
+apt e quebraria a cada atualização do navegador.
+
+### Primeira execução
+
+Vale rodar uma rodada só, acompanhando, antes de deixar contínuo. Localmente:
+
+```bash
+RPA_VISIVEL=true node src/index.js --uma-vez
+```
+
+Com um veículo pendente, dá para ver o navegador percorrendo os quatro passos.
 
 ## Quando algo falha
 
