@@ -19,6 +19,7 @@
     "schema": "../../prisma/schema.prisma"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
     "@hookform/resolvers": "^3.3.4",
     "@isenta/shared": "workspace:*",
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -33,9 +34,9 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
+    "imapflow": "^1.0.194",
     "next": "^14.0.4",
     "next-auth": "^4.24.10",
-    "imapflow": "^1.0.194",
     "nodemailer": "^9.0.3",
     "playwright": "^1.62.1",
     "react": "^18.2.0",

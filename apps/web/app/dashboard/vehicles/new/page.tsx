@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import { VehicleForm } from '@/components/forms/VehicleForm';
+import { LeitorCrlv, type DadosCrlv } from '@/components/LeitorCrlv';
 import { Button } from '@/components/ui/Button';
 
 interface Conta {
@@ -17,6 +18,7 @@ export default function NewVehiclePage() {
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [accounts, setAccounts] = useState<Conta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lido, setLido] = useState<DadosCrlv | null>(null);
 
   const papel = (session?.user as any)?.role;
   const contaDoOperador = (session?.user as any)?.accountId as string | undefined;
@@ -47,6 +49,22 @@ export default function NewVehiclePage() {
     carregarContas();
   }, [status, papel]);
 
+  // A `key` remonta o formulário quando a leitura chega: os campos lidos são
+  // estado inicial, então sem remontar eles não apareceriam na tela.
+  function leitorEFormulario(contaId: string) {
+    return (
+      <div className="space-y-6">
+        <LeitorCrlv onLido={setLido} />
+        <VehicleForm
+          key={lido ? 'lido' : 'vazio'}
+          accountId={contaId}
+          lidosDoCrlv={lido ?? undefined}
+          camposIncertos={lido?.camposIncertos ?? []}
+        />
+      </div>
+    );
+  }
+
   if (status === 'loading' || loading) {
     return <div className="text-paper">Carregando...</div>;
   }
@@ -67,7 +85,7 @@ export default function NewVehiclePage() {
           <h1 className="font-display text-3xl font-bold text-paper">Novo Veículo</h1>
           <p className="mt-1 text-paper-dim">Cadastre um novo veículo na sua frota</p>
         </div>
-        <VehicleForm accountId={contaDoOperador} />
+        {leitorEFormulario(contaDoOperador)}
       </div>
     );
   }
@@ -114,7 +132,7 @@ export default function NewVehiclePage() {
           {accounts.find(c => c.id === selectedAccountId)?.name ?? 'Cadastre um novo veículo'}
         </p>
       </div>
-      <VehicleForm accountId={selectedAccountId} />
+      {leitorEFormulario(selectedAccountId)}
     </div>
   );
 }

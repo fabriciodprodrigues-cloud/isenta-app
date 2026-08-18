@@ -23,23 +23,56 @@ interface VehicleFormProps {
     anoFabricacao?: number;
     anoModelo?: number;
   };
+  /**
+   * Valores vindos da leitura do CRLV. Preenchem os campos; não salvam nada —
+   * o operador confirma. A tela é remontada quando chegam, então basta o
+   * estado inicial.
+   */
+  lidosDoCrlv?: {
+    placa: string | null;
+    renavam: string | null;
+    marca: string | null;
+    modelo: string | null;
+    cor: string | null;
+    anoFabricacao: number | null;
+    anoModelo: number | null;
+    categoria: string | null;
+  };
+  /** Campos que a leitura não conseguiu ler com clareza — destacados na tela. */
+  camposIncertos?: string[];
 }
 
-export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
+export function VehicleForm({
+  accountId,
+  vehicle,
+  lidosDoCrlv,
+  camposIncertos = [],
+}: VehicleFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    plate: vehicle?.plate || '',
-    renavam: vehicle?.renavam || '',
+    plate: lidosDoCrlv?.placa || vehicle?.plate || '',
+    renavam: lidosDoCrlv?.renavam || vehicle?.renavam || '',
     type: vehicle?.type || 'proprio',
-    category: vehicle?.category || 'oficial',
-    marca: vehicle?.marca || '',
-    modelo: vehicle?.modelo || '',
-    cor: vehicle?.cor || '',
-    anoFabricacao: vehicle?.anoFabricacao?.toString() || new Date().getFullYear().toString(),
-    anoModelo: vehicle?.anoModelo?.toString() || new Date().getFullYear().toString(),
+    // O CRLV não diz se o veículo é próprio ou locado — isso é contrato, não
+    // documento do veículo. `type` fica no padrão para o operador escolher.
+    category: lidosDoCrlv?.categoria || vehicle?.category || 'oficial',
+    marca: lidosDoCrlv?.marca || vehicle?.marca || '',
+    modelo: lidosDoCrlv?.modelo || vehicle?.modelo || '',
+    cor: lidosDoCrlv?.cor || vehicle?.cor || '',
+    anoFabricacao:
+      lidosDoCrlv?.anoFabricacao?.toString() ||
+      vehicle?.anoFabricacao?.toString() ||
+      new Date().getFullYear().toString(),
+    anoModelo:
+      lidosDoCrlv?.anoModelo?.toString() ||
+      vehicle?.anoModelo?.toString() ||
+      new Date().getFullYear().toString(),
   });
+
+  // Mapeia o nome do campo na leitura para o nome no formulário.
+  const incerto = (campo: string) => camposIncertos.includes(campo);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -105,6 +138,29 @@ export function VehicleForm({ accountId, vehicle }: VehicleFormProps) {
           {error && (
             <div className="rounded-lg border border-red-500/50 bg-red-500/10 p-4 text-red-300 text-sm">
               {error}
+            </div>
+          )}
+
+          {lidosDoCrlv && (
+            <div
+              className={
+                camposIncertos.length > 0
+                  ? 'rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-paper'
+                  : 'rounded-lg border border-green/40 bg-green/10 p-4 text-sm text-paper'
+              }
+            >
+              {camposIncertos.length > 0 ? (
+                <>
+                  Campos preenchidos pelo CRLV. A leitura ficou em dúvida em{' '}
+                  <strong>{camposIncertos.join(', ')}</strong> — confira esses
+                  antes de salvar.
+                </>
+              ) : (
+                <>
+                  Campos preenchidos pelo CRLV. Confira antes de salvar: o
+                  pedido de isenção sai em nome do órgão com estes dados.
+                </>
+              )}
             </div>
           )}
 
