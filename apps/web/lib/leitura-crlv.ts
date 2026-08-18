@@ -49,6 +49,34 @@ export const crlvSchema = z.object({
 
 export type DadosCrlv = z.infer<typeof crlvSchema>;
 
+/** Preços do claude-opus-5, em dólares por milhão de tokens. */
+const PRECO_ENTRADA_POR_MILHAO = 5;
+const PRECO_SAIDA_POR_MILHAO = 25;
+
+export interface CustoLeitura {
+  tokensEntrada: number;
+  tokensSaida: number;
+  /** Em dólares. O pensamento do modelo é cobrado como saída e entra na conta. */
+  dolares: number;
+}
+
+/**
+ * Custo da chamada, calculado a partir do uso que a própria resposta reporta.
+ *
+ * Existe porque estimar o custo de leitura de imagem por fora erra feio: o
+ * consumo depende da resolução do documento, e um scan de celular pode custar
+ * várias vezes o de um PDF gerado por sistema.
+ */
+function calcularCusto(uso: { input_tokens: number; output_tokens: number }): CustoLeitura {
+  return {
+    tokensEntrada: uso.input_tokens,
+    tokensSaida: uso.output_tokens,
+    dolares:
+      (uso.input_tokens / 1_000_000) * PRECO_ENTRADA_POR_MILHAO +
+      (uso.output_tokens / 1_000_000) * PRECO_SAIDA_POR_MILHAO,
+  };
+}
+
 /**
  * Schema enviado à API. Escrito à mão em vez de derivado do Zod porque
  * `output_config.format` recusa construções que o Zod gera por padrão
@@ -151,8 +179,11 @@ function blocoDoDocumento(arquivo: Buffer, tipo: string) {
   };
 }
 
-/** Lê o CRLV e devolve os campos do formulário. */
-export async function lerCrlv(arquivo: Buffer, tipo: string): Promise<DadosCrlv> {
+/** Lê o CRLV e devolve os campos do formulário, com o custo da chamada. */
+export async function lerCrlv(
+  arquivo: Buffer,
+  tipo: string
+): Promise<{ dados: DadosCrlv; custo: CustoLeitura }> {
   if (!TIPOS_ACEITOS.includes(tipo as (typeof TIPOS_ACEITOS)[number])) {
     throw new Error(`Formato não suportado para leitura: ${tipo}`);
   }
@@ -203,5 +234,8 @@ export async function lerCrlv(arquivo: Buffer, tipo: string): Promise<DadosCrlv>
 
   // .parse() e não .safeParse(): um retorno fora do schema é defeito nosso, e
   // preencher o formulário com dado malformado é pior que falhar aqui.
-  return crlvSchema.parse(JSON.parse(texto.text));
+  return {
+    dados: crlvSchema.parse(JSON.parse(texto.text)),
+    custo: calcularCusto(resposta.usage),
+  };
 }

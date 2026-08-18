@@ -64,11 +64,16 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = Buffer.from(await arquivo.arrayBuffer());
-    const dados = await lerCrlv(bytes, meta.contentType || 'application/pdf');
+    const { dados, custo } = await lerCrlv(bytes, meta.contentType || 'application/pdf');
 
+    // O custo vai para o log de propósito: sem número medido, a conta do mês
+    // chega sem ninguém saber quanto custa uma leitura nem o que a encarece.
     console.log(
       `CRLV lido por ${(session.user as any).email}: placa ${dados.placa ?? '—'}, ` +
-        `${dados.camposIncertos.length} campo(s) incerto(s)`
+        `${dados.camposIncertos.length} campo(s) incerto(s), ` +
+        `${(meta.size / 1024 / 1024).toFixed(1)} MB, ` +
+        `${custo.tokensEntrada} tokens de entrada + ${custo.tokensSaida} de saída, ` +
+        `US$ ${custo.dolares.toFixed(4)}`
     );
 
     return NextResponse.json({ dados });
