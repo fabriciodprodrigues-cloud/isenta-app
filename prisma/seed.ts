@@ -4,7 +4,48 @@ import { CONCESSIONARIAS_COMPLETAS } from './concessionarias-completas-v2';
 
 const prisma = new PrismaClient();
 
+/**
+ * Impede que o seed rode contra um banco que não seja local.
+ *
+ * Este arquivo começa apagando TODAS as tabelas. Enquanto o projeto era só
+ * desenvolvimento isso era inofensivo, e oito guias do repositório passaram a
+ * mandar rodar `prisma db seed`. Depois que a produção subiu, o .env passou a
+ * apontar para o banco real e esses mesmos guias viraram instruções para
+ * destruí-lo — foi exatamente o que aconteceu em 18/08/2026.
+ *
+ * A trava fica aqui, e não na documentação, porque documentação não é executada.
+ */
+function exigirBancoLocal() {
+  const url = process.env.DATABASE_URL;
+
+  if (!url) {
+    throw new Error('DATABASE_URL ausente: nada a semear.');
+  }
+
+  const host = new URL(url).hostname.toLowerCase();
+  const ehLocal =
+    host === 'localhost' || host === '127.0.0.1' || host === 'db' || host === 'postgres';
+
+  if (ehLocal) return;
+
+  // A saída de emergência existe para o caso legítimo de repovoar um ambiente
+  // de teste remoto. Ela é explícita de propósito: ninguém a digita por engano.
+  if (process.env.PERMITIR_SEED_REMOTO === 'sim, apagar tudo') {
+    console.warn(`\n⚠️  Semeando banco REMOTO em ${host} — apagando tudo.\n`);
+    return;
+  }
+
+  throw new Error(
+    `\nO seed apaga TODAS as tabelas e o DATABASE_URL aponta para ${host}, que não é local.\n` +
+      `Se este for o banco de produção, rodar isto destrói os dados reais.\n\n` +
+      `Para semear mesmo assim, defina:\n` +
+      `  PERMITIR_SEED_REMOTO="sim, apagar tudo"\n`
+  );
+}
+
 async function main() {
+  exigirBancoLocal();
+
   console.log('🌱 Seeding database...');
 
   // Limpar dados existentes

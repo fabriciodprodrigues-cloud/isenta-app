@@ -54,6 +54,8 @@ docker-compose exec web pnpm exec prisma migrate deploy
 5. **Popule o banco de dados (opcional)**
 ```bash
 docker-compose exec web pnpm exec prisma db seed
+# ATENCAO: o seed APAGA TODAS AS TABELAS. So rode contra banco local.
+# Contra o banco de producao ele destroi os dados reais — ja aconteceu em 18/08/2026.
 ```
 
 6. **Acesse a aplicação**
@@ -156,6 +158,8 @@ DATABASE_URL="postgresql://user:password@localhost:5432/isenta_db"
 cd apps/web
 pnpm exec prisma migrate deploy
 pnpm exec prisma db seed
+# ATENCAO: o seed APAGA TODAS AS TABELAS. So rode contra banco local.
+# Contra o banco de producao ele destroi os dados reais — ja aconteceu em 18/08/2026.
 ```
 
 4. **Build da aplicação**

@@ -141,6 +141,8 @@ pnpm exec prisma migrate dev
 
 # Seed com dados demo (opcional)
 pnpm exec prisma db seed
+# ATENCAO: o seed APAGA TODAS AS TABELAS. So rode contra banco local.
+# Contra o banco de producao ele destroi os dados reais — ja aconteceu em 18/08/2026.
 ```
 
 ### 2. Iniciar Dev

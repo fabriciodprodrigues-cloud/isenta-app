@@ -222,6 +222,8 @@ Se vencimento é em 30 dias:
    ```bash
    pnpm exec prisma reset
    pnpm exec prisma db seed
+   # ATENCAO: o seed APAGA TODAS AS TABELAS. So rode contra banco local.
+   # Contra o banco de producao ele destroi os dados reais — ja aconteceu em 18/08/2026.
    ```
 
 2. **Ver console do servidor:**

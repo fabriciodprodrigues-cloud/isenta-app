@@ -49,6 +49,8 @@ pnpm exec prisma migrate dev
 
 # 4. Seed do banco com usuário demo (opcional)
 pnpm exec prisma db seed
+# ATENCAO: o seed APAGA TODAS AS TABELAS. So rode contra banco local.
+# Contra o banco de producao ele destroi os dados reais — ja aconteceu em 18/08/2026.
 
 # 5. Iniciar dev server
 pnpm dev
@@ -111,6 +113,8 @@ pnpm type-check       # Verificar tipos TypeScript
 # Banco de dados
 pnpm exec prisma migrate dev
 pnpm exec prisma db seed
+# ATENCAO: o seed APAGA TODAS AS TABELAS. So rode contra banco local.
+# Contra o banco de producao ele destroi os dados reais — ja aconteceu em 18/08/2026.
 pnpm exec prisma studio
 
 # Lint
