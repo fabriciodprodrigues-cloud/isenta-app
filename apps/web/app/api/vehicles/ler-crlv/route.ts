@@ -8,6 +8,7 @@ import {
   DocumentoGrandeDemaisError,
   LeituraRecusadaError,
 } from '@/lib/leitura-crlv';
+import { lerCrlvDoTexto, extracaoFoiSuficiente } from '@/lib/leitura-crlv-texto';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
@@ -33,15 +34,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json(
-      {
-        error:
-          'A leitura automática não está configurada no servidor (ANTHROPIC_API_KEY ausente).',
-      },
-      { status: 503 }
-    );
-  }
+  // Sem checagem de ANTHROPIC_API_KEY aqui: a leitura pela camada de texto do
+  // PDF não usa modelo nenhum e funciona sem chave. A verificação acontece
+  // adiante, só se for preciso cair para a leitura por imagem.
 
   try {
     const { pathname } = schema.parse(await request.json());
@@ -64,7 +59,45 @@ export async function POST(request: NextRequest) {
     }
 
     const bytes = Buffer.from(await arquivo.arrayBuffer());
-    const { dados, custo } = await lerCrlv(bytes, meta.contentType || 'application/pdf');
+    const tipo = meta.contentType || 'application/pdf';
+
+    // Caminho gratuito primeiro. O CRLV-e é gerado pelo Detran e traz o texto
+    // dentro do PDF; ler dali não custa nada e não interpreta — transcreve.
+    if (tipo === 'application/pdf') {
+      try {
+        const { dados, temTexto } = await lerCrlvDoTexto(bytes);
+
+        if (temTexto && extracaoFoiSuficiente(dados)) {
+          console.log(
+            `CRLV lido do texto por ${(session.user as any).email}: ` +
+              `placa ${dados.placa}, ${dados.camposIncertos.length} campo(s) incerto(s), custo zero`
+          );
+          return NextResponse.json({ dados, origem: 'texto' });
+        }
+
+        console.log(
+          temTexto
+            ? 'CRLV tem texto mas o layout não rendeu placa e RENAVAM; caindo para leitura por visão.'
+            : 'CRLV sem camada de texto (digitalizado); caindo para leitura por visão.'
+        );
+      } catch (erroTexto) {
+        // PDF corrompido ou protegido não deve derrubar a leitura — só perde a
+        // via gratuita.
+        console.error('Falha ao extrair texto do PDF:', erroTexto);
+      }
+    }
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível ler este arquivo pelo texto, e a leitura por imagem não está configurada. Preencha manualmente.',
+        },
+        { status: 422 }
+      );
+    }
+
+    const { dados, custo } = await lerCrlv(bytes, tipo);
 
     // O custo vai para o log de propósito: sem número medido, a conta do mês
     // chega sem ninguém saber quanto custa uma leitura nem o que a encarece.

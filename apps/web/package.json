@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
+    "testar-crlv": "tsx scripts/testar-leitura-crlv.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
@@ -44,6 +45,7 @@
     "react-hook-form": "^7.48.0",
     "redis": "^6.2.0",
     "tailwindcss-animate": "^1.0.7",
+    "unpdf": "^1.8.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
@@ -56,6 +58,7 @@
     "autoprefixer": "^10.4.16",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.0.4",
+    "pdf-lib": "^1.17.1",
     "postcss": "^8.4.32",
     "prisma": "^5.22.0",
     "tailwindcss": "^3.4.1",
