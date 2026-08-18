@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { head } from '@vercel/blob';
+import { get } from '@vercel/blob';
 import { auth } from '@/lib/auth';
 import {
   lerCrlv,
@@ -41,25 +41,28 @@ export async function POST(request: NextRequest) {
   try {
     const { pathname } = schema.parse(await request.json());
 
-    const meta = await head(pathname, { access: 'private' } as any);
+    // get() e não fetch na URL: o store é privado, e a URL do blob não abre
+    // sem credencial — buscá-la direto falha com "não foi possível abrir o
+    // arquivo". Aqui a própria biblioteca autentica, e ainda devolve tipo e
+    // tamanho junto do conteúdo, dispensando um head() antes.
+    const blob = await get(pathname, { access: 'private' });
 
-    if (meta.size > TAMANHO_MAXIMO_BYTES) {
-      return NextResponse.json(
-        { error: new DocumentoGrandeDemaisError(meta.size).message },
-        { status: 413 }
-      );
-    }
-
-    const arquivo = await fetch(meta.downloadUrl ?? meta.url);
-    if (!arquivo.ok) {
+    if (!blob || blob.statusCode !== 200) {
       return NextResponse.json(
         { error: 'Não foi possível abrir o arquivo enviado.' },
         { status: 502 }
       );
     }
 
-    const bytes = Buffer.from(await arquivo.arrayBuffer());
-    const tipo = meta.contentType || 'application/pdf';
+    if (blob.blob.size > TAMANHO_MAXIMO_BYTES) {
+      return NextResponse.json(
+        { error: new DocumentoGrandeDemaisError(blob.blob.size).message },
+        { status: 413 }
+      );
+    }
+
+    const bytes = Buffer.from(await new Response(blob.stream).arrayBuffer());
+    const tipo = blob.blob.contentType || 'application/pdf';
 
     // Caminho gratuito primeiro. O CRLV-e é gerado pelo Detran e traz o texto
     // dentro do PDF; ler dali não custa nada e não interpreta — transcreve.
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
     console.log(
       `CRLV lido por ${(session.user as any).email}: placa ${dados.placa ?? '—'}, ` +
         `${dados.camposIncertos.length} campo(s) incerto(s), ` +
-        `${(meta.size / 1024 / 1024).toFixed(1)} MB, ` +
+        `${(blob.blob.size / 1024 / 1024).toFixed(1)} MB, ` +
         `${custo.tokensEntrada} tokens de entrada + ${custo.tokensSaida} de saída, ` +
         `US$ ${custo.dolares.toFixed(4)}`
     );
