@@ -40,9 +40,9 @@ export async function GET(
 
     // Calcular dados
     const totalVehicles = vehicles.length;
-    const approvedVehicles = vehicles.filter(v => v.status === 'aprovado').length;
-    const draftVehicles = vehicles.filter(v => v.status === 'rascunho').length;
-    const expiringIn30Days = vehicles.filter(v => {
+    const approvedVehicles = vehicles.filter((v: any) => v.status === 'aprovado').length;
+    const draftVehicles = vehicles.filter((v: any) => v.status === 'rascunho').length;
+    const expiringIn30Days = vehicles.filter((v: any) => {
       if (!v.expiresAt) return false;
       // Terceira implementacao do mesmo calculo no projeto, e a unica que nao
       // normalizava o dia — contava fracoes de 24h a partir do instante atual.
@@ -51,7 +51,7 @@ export async function GET(
     }).length;
 
     const pendingDocuments = documents.filter(
-      d => new Date(d.uploadedAt).getMonth() === new Date().getMonth()
+      (d: any) => new Date(d.uploadedAt).getMonth() === new Date().getMonth()
     ).length;
 
     return NextResponse.json({

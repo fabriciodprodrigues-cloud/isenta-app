@@ -48,14 +48,14 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
-    const accountsWithStats = accounts.map(account => {
+    const accountsWithStats = accounts.map((account: any) => {
       // Cadastros pendem de Vehicle, nao de Account: a conta so os alcanca
       // atravessando seus veiculos.
-      const registrations = account.vehicles.flatMap(v => v.registrations);
+      const registrations = account.vehicles.flatMap((v: any) => v.registrations);
 
       const totalCadastros = registrations.length;
-      const cadastrosAtivos = registrations.filter(r => r.status === 'aprovado').length;
-      const cadastrosPendentes = registrations.filter(r => r.status === 'enviado' || r.status === 'aguardando_resposta').length;
+      const cadastrosAtivos = registrations.filter((r: any) => r.status === 'aprovado').length;
+      const cadastrosPendentes = registrations.filter((r: any) => r.status === 'enviado' || r.status === 'aguardando_resposta').length;
 
       let saude = 'amarelo';
       if (totalCadastros > 0) {
@@ -74,6 +74,11 @@ export async function GET(request: NextRequest) {
         telefone: account.telefone,
         city: account.city,
         state: account.state,
+        status: account.status,
+        responsibleName: account.responsibleName,
+        responsibleEmail: account.responsibleEmail,
+        responsiblePhone: account.responsiblePhone,
+        address: account.address,
         operadores: account.users.length,
         veiculos: account.vehicles.length,
         cadastrosAtivos,

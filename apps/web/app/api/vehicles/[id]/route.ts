@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library.js';
 import { z } from 'zod';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
@@ -105,7 +106,7 @@ export async function PUT(
     // A placa e unica dentro da conta (@@unique([accountId, plate])), entao
     // renomear para uma ja existente e um erro do usuario, nao do servidor.
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error instanceof PrismaClientKnownRequestError &&
       error.code === 'P2002'
     ) {
       return NextResponse.json(

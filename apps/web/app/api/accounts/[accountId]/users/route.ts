@@ -37,17 +37,17 @@ export async function GET(
   // informacao que o admin precisa para saber se deve reenviar.
   const convites = await prisma.passwordResetToken.findMany({
     where: {
-      userId: { in: usuarios.map(u => u.id) },
+      userId: { in: usuarios.map((u: any) => u.id) },
       usedAt: null,
       expiresAt: { gt: new Date() },
     },
     select: { userId: true, expiresAt: true },
   });
 
-  const pendentes = new Map(convites.map(c => [c.userId, c.expiresAt]));
+  const pendentes = new Map(convites.map((c: any) => [c.userId, c.expiresAt]));
 
   return NextResponse.json(
-    usuarios.map(u => ({
+    usuarios.map((u: any) => ({
       ...u,
       convitePendenteAte: pendentes.get(u.id) ?? null,
     }))

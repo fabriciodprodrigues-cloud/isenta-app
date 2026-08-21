@@ -67,7 +67,7 @@ export async function GET() {
     ]);
 
     const porStatus = Object.fromEntries(
-      cadastrosPorStatus.map(c => [c.status, c._count])
+      cadastrosPorStatus.map((c: any) => [c.status, c._count])
     );
 
     let vencendo = 0;
@@ -90,14 +90,14 @@ export async function GET() {
       tagsEstoque,
       tagsAtivadas,
       pendencias: {
-        recusados: recusados.map(r => ({
+        recusados: recusados.map((r: any) => ({
           id: r.id,
           placa: r.vehicle.plate,
           orgao: r.vehicle.account.name,
           concessionaria: r.concessionaire.name,
           motivo: r.rejectionReason ?? 'Motivo não informado',
         })),
-        semDocumento: semDocumento.map(r => ({
+        semDocumento: semDocumento.map((r: any) => ({
           id: r.id,
           placa: r.vehicle.plate,
           orgao: r.vehicle.account.name,
