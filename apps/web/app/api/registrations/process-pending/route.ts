@@ -6,6 +6,10 @@ import { NextResponse } from 'next/server';
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
 
+// Processa várias solicitações em lote, cada uma agora passando pelo relay
+// de e-mail (VPS) — mais tempo que o padrão de 10s pode cobrir.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const session = await auth();

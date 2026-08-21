@@ -130,6 +130,23 @@ export class RemetenteDoOrgaoAusenteError extends Error {
   }
 }
 
+export class RelayDeEmailNaoConfiguradoError extends Error {
+  constructor() {
+    super(
+      'Relay de e-mail não configurado: defina EMAIL_RELAY_URL e ' +
+        'EMAIL_RELAY_SECRET.'
+    );
+    this.name = 'RelayDeEmailNaoConfiguradoError';
+  }
+}
+
+export class RelayDeEmailFalhouError extends Error {
+  constructor(detalhe: string) {
+    super(`Falha ao enviar pelo relay de e-mail: ${detalhe}`);
+    this.name = 'RelayDeEmailFalhouError';
+  }
+}
+
 /**
  * Envia o ofício de pedido de isenção para uma concessionária.
  *
@@ -140,6 +157,12 @@ export class RemetenteDoOrgaoAusenteError extends Error {
  *
  * Sem credencial do órgão o envio falha — não há caminho alternativo, de
  * propósito.
+ *
+ * O envio em si não fala com o SMTP direto daqui: passa por um relay num VPS
+ * com IP fixo (ver HANDOFF.md, seção 4). Caixas como a da UOL Host exigem
+ * autorizar o IP de origem, e a Vercel não oferece IP de saída fixo em
+ * funções normais. A credencial é decifrada aqui e vai pronta, uma vez, numa
+ * chamada HTTPS autenticada — o relay não guarda nada.
  */
 export async function enviarOficioDeIsencao({
   destino,
@@ -156,29 +179,59 @@ export async function enviarOficioDeIsencao({
     throw new RemetenteDoOrgaoAusenteError(dados.orgao.name);
   }
 
-  const transporter = nodemailer.createTransport({
-    host: remetente.host,
-    port: remetente.port,
-    secure: remetente.secure,
-    auth: { user: remetente.user, pass: remetente.pass },
-  });
+  const relayUrl = process.env.EMAIL_RELAY_URL;
+  const relaySecret = process.env.EMAIL_RELAY_SECRET;
+  if (!relayUrl || !relaySecret) {
+    throw new RelayDeEmailNaoConfiguradoError();
+  }
 
   const { texto, html } = montarOficio(dados);
   const attachments = await baixarAnexos(anexos);
-
   const razao = dados.orgao.razaoSocial || dados.orgao.name;
 
-  await transporter.sendMail({
-    // O remetente é a própria caixa autenticada. Divergir daqui costuma ser
-    // rejeitado pelo servidor ou marcado como falsificação.
-    from: `"${razao}" <${remetente.user}>`,
-    to: destino,
-    replyTo: dados.orgao.responsibleEmail,
-    subject: assuntoDoOficio(dados.orgao.name),
-    text: texto,
-    html,
-    attachments,
-  });
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${relayUrl}/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': relaySecret,
+      },
+      body: JSON.stringify({
+        host: remetente.host,
+        port: remetente.port,
+        secure: remetente.secure,
+        user: remetente.user,
+        password: remetente.pass,
+        // O remetente é a própria caixa autenticada. Divergir daqui costuma
+        // ser rejeitado pelo servidor ou marcado como falsificação.
+        from: `"${razao}" <${remetente.user}>`,
+        to: destino,
+        replyTo: dados.orgao.responsibleEmail,
+        subject: assuntoDoOficio(dados.orgao.name),
+        text: texto,
+        html,
+        attachments: attachments.map(a => ({
+          filename: a.filename,
+          content: a.content.toString('base64'),
+        })),
+      }),
+      // O relay já tem seu próprio timeout de SMTP; este é só para não
+      // deixar a função da Vercel pendurada se o VPS ficar inacessível.
+      signal: AbortSignal.timeout(45_000),
+    });
+  } catch (erro) {
+    throw new RelayDeEmailFalhouError(
+      erro instanceof Error ? erro.message : String(erro)
+    );
+  }
+
+  if (!resposta.ok) {
+    const corpo = await resposta.json().catch(() => null);
+    throw new RelayDeEmailFalhouError(
+      corpo?.detalhe || corpo?.erro || `HTTP ${resposta.status}`
+    );
+  }
 
   return { anexosEnviados: attachments.length, remetenteUsado: remetente.user };
 }

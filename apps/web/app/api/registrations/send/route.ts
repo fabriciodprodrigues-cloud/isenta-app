@@ -1,11 +1,21 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { processRegistration } from '@/lib/registration-orchestrator';
-import { EmailNaoConfiguradoError } from '@/lib/email-service';
+import {
+  EmailNaoConfiguradoError,
+  RemetenteDoOrgaoAusenteError,
+  RelayDeEmailNaoConfiguradoError,
+  RelayDeEmailFalhouError,
+} from '@/lib/email-service';
 import { NextResponse } from 'next/server';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
+
+// O envio agora passa pelo relay de e-mail (VPS) antes de chegar ao SMTP do
+// órgão — mais um salto de rede que o padrão de 10s pode não cobrir,
+// especialmente com anexos grandes.
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
@@ -104,6 +114,32 @@ export async function POST(request: Request) {
         },
         { status: 503 }
       );
+    }
+
+    if (error instanceof RelayDeEmailNaoConfiguradoError) {
+      console.error('Envio bloqueado: relay de e-mail ausente.', error.message);
+      return NextResponse.json(
+        {
+          error:
+            'O relay de e-mail ainda não está configurado no servidor. A solicitação continua pendente e pode ser reenviada depois.',
+        },
+        { status: 503 }
+      );
+    }
+
+    if (error instanceof RelayDeEmailFalhouError) {
+      console.error('Envio falhou no relay de e-mail:', error.message);
+      return NextResponse.json(
+        {
+          error:
+            'Não foi possível enviar pelo relay de e-mail agora. A solicitação continua pendente e pode ser reenviada depois.',
+        },
+        { status: 502 }
+      );
+    }
+
+    if (error instanceof RemetenteDoOrgaoAusenteError) {
+      return NextResponse.json({ error: error.message }, { status: 428 });
     }
 
     console.error('Erro ao enviar solicitação:', error);

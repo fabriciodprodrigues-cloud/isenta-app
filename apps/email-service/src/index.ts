@@ -19,7 +19,9 @@ dotenv.config();
  */
 
 const app = express();
-app.use(express.json());
+// Limite maior que o padrão (100kb): o ofício de isenção anexa o CRLV de
+// cada veículo da frota em base64, que infla o tamanho em cerca de um terço.
+app.use(express.json({ limit: '40mb' }));
 
 const porta = Number(process.env.PORT) || 3000;
 
@@ -51,6 +53,14 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+interface AnexoEnvio {
+  /** Nome do arquivo como deve aparecer no e-mail — não é validado contra o
+   *  conteúdo, então quem chama é responsável por mandar o nome certo. */
+  filename?: string;
+  /** Conteúdo em base64. */
+  content?: string;
+}
+
 interface CorpoEnvio {
   host?: string;
   port?: number;
@@ -59,18 +69,41 @@ interface CorpoEnvio {
   password?: string;
   from?: string;
   to?: string;
+  replyTo?: string;
   subject?: string;
   text?: string;
   html?: string;
+  attachments?: AnexoEnvio[];
 }
 
 app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, res: Response) => {
-  const { host, port: portaSmtp, secure, user, password, from, to, subject, text, html } = req.body ?? {};
+  const {
+    host,
+    port: portaSmtp,
+    secure,
+    user,
+    password,
+    from,
+    to,
+    replyTo,
+    subject,
+    text,
+    html,
+    attachments,
+  } = req.body ?? {};
 
   if (!host || !user || !password || !to || !subject) {
     res.status(400).json({ erro: 'Campos obrigatórios: host, user, password, to, subject.' });
     return;
   }
+
+  // Anexo sem nome ou sem conteúdo não é um erro do chamador que vale a pena
+  // travar o envio inteiro — mas também não pode virar um arquivo mudo no
+  // e-mail. Descarta e segue, e quem chama vê no messageId que o envio
+  // aconteceu mesmo sem aquele anexo específico.
+  const anexosValidos = (attachments ?? [])
+    .filter((a): a is Required<AnexoEnvio> => Boolean(a.filename && a.content))
+    .map(a => ({ filename: a.filename, content: Buffer.from(a.content, 'base64') }));
 
   try {
     const transportador = createTransport({
@@ -83,12 +116,18 @@ app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, 
     const info = await transportador.sendMail({
       from: from || user,
       to,
+      replyTo,
       subject,
       text,
       html,
+      attachments: anexosValidos.length > 0 ? anexosValidos : undefined,
     });
 
-    res.status(200).json({ mensagem: 'E-mail enviado', messageId: info.messageId });
+    res.status(200).json({
+      mensagem: 'E-mail enviado',
+      messageId: info.messageId,
+      anexosEnviados: anexosValidos.length,
+    });
   } catch (erro) {
     // Erro de SMTP (autenticação, IP bloqueado, etc.) não é bug nosso — é
     // resposta do servidor remoto. 502 (bad gateway) sinaliza isso melhor
