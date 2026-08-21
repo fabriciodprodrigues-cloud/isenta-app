@@ -17,6 +17,7 @@ const update_account_schema = z.object({
   city: z.string().min(2).optional(),
   state: z.string().length(2).optional(),
   status: z.enum(['active', 'inactive', 'pending']).optional(),
+  razaoSocial: z.string().optional(),
 });
 
 export async function GET(
