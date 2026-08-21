@@ -55,6 +55,13 @@ export default function GestaoConcessionarias() {
   const [formDestino, setFormDestino] = useState('');
   const [formObs, setFormObs] = useState('');
 
+  const [criando, setCriando] = useState(false);
+  const [criandoSalvando, setCriandoSalvando] = useState(false);
+  const [novoNome, setNovoNome] = useState('');
+  const [novoRegulador, setNovoRegulador] = useState('');
+  const [novaEsfera, setNovaEsfera] = useState('FEDERAL');
+  const [novosEstados, setNovosEstados] = useState('');
+
   async function carregar() {
     try {
       const resposta = await fetch('/api/concessionaires');
@@ -71,9 +78,58 @@ export default function GestaoConcessionarias() {
     carregar();
   }, []);
 
+  function abrirCriacao() {
+    setErro('');
+    setAviso('');
+    setEditando(null);
+    setCriando(true);
+    setNovoNome('');
+    setNovoRegulador('');
+    setNovaEsfera('FEDERAL');
+    setNovosEstados('');
+  }
+
+  async function criar() {
+    setErro('');
+    setAviso('');
+    setCriandoSalvando(true);
+
+    try {
+      const resposta = await fetch('/api/concessionaires', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: novoNome.trim(),
+          regulador: novoRegulador.trim(),
+          esfera: novaEsfera,
+          estados: novosEstados.trim() || undefined,
+        }),
+      });
+
+      const corpo = await resposta.json().catch(() => null);
+
+      if (!resposta.ok) {
+        setErro(corpo?.error ?? 'Não foi possível criar a concessionária.');
+        return;
+      }
+
+      setAviso(
+        `"${corpo.name}" criada. Ainda não recebe solicitações reais — use ` +
+          '"Editar" para mapear um canal (ex: seu próprio e-mail) antes de testar.'
+      );
+      setCriando(false);
+      await carregar();
+    } catch {
+      setErro('Falha de conexão ao criar.');
+    } finally {
+      setCriandoSalvando(false);
+    }
+  }
+
   function abrirEdicao(c: Concessionaria) {
     setErro('');
     setAviso('');
+    setCriando(false);
     setEditando(c.id);
     setFormTipo(c.tipoCanal ?? '');
     setFormDestino(c.canalIsentos ?? '');
@@ -144,11 +200,16 @@ export default function GestaoConcessionarias() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-paper">Gestão de Concessionárias</h1>
-        <p className="mt-1 text-sm text-paper-dim">
-          Canais de isenção mapeados e situação de cada concessionária
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-paper">Gestão de Concessionárias</h1>
+          <p className="mt-1 text-sm text-paper-dim">
+            Canais de isenção mapeados e situação de cada concessionária
+          </p>
+        </div>
+        <Button onClick={abrirCriacao} disabled={criando}>
+          + Nova concessionária
+        </Button>
       </div>
 
       {erro && (
@@ -161,6 +222,87 @@ export default function GestaoConcessionarias() {
         <div className="rounded border border-green/40 bg-green/10 p-3 text-sm text-paper">
           {aviso}
         </div>
+      )}
+
+      {criando && (
+        <Card>
+          <CardBody>
+            <div className="space-y-3 rounded border border-green/30 bg-ink-700/40 p-4">
+              <p className="font-medium text-paper">Nova concessionária</p>
+              <p className="text-xs text-paper-dim">
+                Fica inativa para cadastro até você mapear um canal em &quot;Editar&quot; —
+                use isso para uma concessionária de teste sem afetar as reais.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-paper-dim">Nome</label>
+                  <input
+                    type="text"
+                    value={novoNome}
+                    onChange={e => setNovoNome(e.target.value)}
+                    placeholder="ex: Concessionária Teste"
+                    className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-paper-dim">Regulador</label>
+                  <input
+                    type="text"
+                    value={novoRegulador}
+                    onChange={e => setNovoRegulador(e.target.value)}
+                    placeholder="ex: ANTT, ARTESP, teste"
+                    className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-paper-dim">Esfera</label>
+                  <select
+                    value={novaEsfera}
+                    onChange={e => setNovaEsfera(e.target.value)}
+                    className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                  >
+                    <option value="FEDERAL">Federal</option>
+                    <option value="ESTADUAL">Estadual</option>
+                    <option value="MUNICIPAL">Municipal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs text-paper-dim">
+                    Estados (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={novosEstados}
+                    onChange={e => setNovosEstados(e.target.value)}
+                    placeholder="ex: SP,RJ"
+                    className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={criar}
+                  disabled={
+                    criandoSalvando || novoNome.trim().length < 3 || novoRegulador.trim().length < 2
+                  }
+                  size="sm"
+                >
+                  {criandoSalvando ? 'Criando...' : 'Criar'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setCriando(false)}
+                  disabled={criandoSalvando}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
       )}
 
       <div className="grid grid-cols-4 gap-4">
