@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { parse_estados } from '@/lib/utils';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library.js';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
@@ -65,31 +66,10 @@ const schemaCriacao = z.object({
   name: z.string().trim().min(3, 'Nome precisa de ao menos 3 caracteres.'),
   regulador: z.string().trim().min(2, 'Informe o regulador (ex: ANTT, ARTESP, ou "teste").'),
   esfera: z.enum(['FEDERAL', 'ESTADUAL', 'MUNICIPAL']).optional(),
-  // Aceita "SP,RJ" digitado; convertido pra array JSON antes de gravar (ver
-  // paraJsonDeEstados). O dado real sempre foi JSON.stringify(["SP","RJ"]) —
-  // format_estados() tolera as duas formas na EXIBIÇÃO da tela de admin, mas
-  // o modal de Solicitar Isenção do operador faz JSON.parse() estrito: uma
-  // string solta quebra o parse, cai no catch, e a concessionária some da
-  // lista sem erro visível nenhum.
+  // Convertido pra array JSON antes de gravar — ver parse_estados em lib/utils.
   estados: z.string().trim().max(200).optional(),
   cnpj: z.string().trim().max(20).optional(),
 });
-
-/** "SP, rj , sp" -> '["SP","RJ"]'. Vazio -> null. */
-function paraJsonDeEstados(bruto: string | undefined): string | null {
-  if (!bruto) return null;
-
-  const siglas = Array.from(
-    new Set(
-      bruto
-        .split(',')
-        .map(s => s.trim().toUpperCase())
-        .filter(Boolean)
-    )
-  );
-
-  return siglas.length > 0 ? JSON.stringify(siglas) : null;
-}
 
 /**
  * Cria uma concessionária avulsa — sobretudo para teste: o operador monta uma
@@ -118,7 +98,7 @@ export async function POST(request: NextRequest) {
         name: dados.name,
         regulador: dados.regulador,
         esfera: dados.esfera ?? 'FEDERAL',
-        estados: paraJsonDeEstados(dados.estados),
+        estados: parse_estados(dados.estados),
         cnpj: dados.cnpj || null,
       },
       select: {

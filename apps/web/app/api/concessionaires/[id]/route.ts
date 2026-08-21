@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { parse_estados } from '@/lib/utils';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,10 @@ const schema = z
     canalIsentos: z.string().trim().max(500).nullable(),
     observacoes: z.string().trim().max(1000).nullable().optional(),
     ativoParaCadastro: z.boolean().optional(),
+    // Texto digitado ("SP, RJ"); convertido pra array JSON antes de gravar
+    // (parse_estados). undefined = campo não enviado, não mexe no valor
+    // salvo; string vazia = limpa o campo.
+    estados: z.string().trim().max(200).optional(),
   })
   .superRefine((dados, ctx) => {
     const destino = dados.canalIsentos?.trim();
@@ -99,6 +104,9 @@ export async function PATCH(
         ...(dados.ativoParaCadastro !== undefined
           ? { ativoParaCadastro: dados.ativoParaCadastro }
           : {}),
+        ...(dados.estados !== undefined
+          ? { estados: parse_estados(dados.estados) }
+          : {}),
       },
       select: {
         id: true,
@@ -107,6 +115,7 @@ export async function PATCH(
         canalIsentos: true,
         observacoes: true,
         ativoParaCadastro: true,
+        estados: true,
       },
     });
 

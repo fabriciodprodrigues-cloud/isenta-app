@@ -55,6 +55,7 @@ export default function GestaoConcessionarias() {
   const [formDestino, setFormDestino] = useState('');
   const [formObs, setFormObs] = useState('');
   const [formAtivo, setFormAtivo] = useState(false);
+  const [formEstados, setFormEstados] = useState('');
 
   const [criando, setCriando] = useState(false);
   const [criandoSalvando, setCriandoSalvando] = useState(false);
@@ -136,6 +137,7 @@ export default function GestaoConcessionarias() {
     setFormDestino(c.canalIsentos ?? '');
     setFormObs(c.observacoes ?? '');
     setFormAtivo(c.ativoParaCadastro);
+    setFormEstados(format_estados(c.estados));
   }
 
   async function salvar(id: string) {
@@ -152,6 +154,7 @@ export default function GestaoConcessionarias() {
           canalIsentos: formDestino.trim() || null,
           observacoes: formObs.trim() || null,
           ativoParaCadastro: formAtivo,
+          estados: formEstados.trim(),
         }),
       });
 
@@ -413,6 +416,25 @@ export default function GestaoConcessionarias() {
                                 className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
                               />
                             </div>
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs text-paper-dim">
+                              Estados
+                            </label>
+                            <input
+                              type="text"
+                              value={formEstados}
+                              onChange={e => setFormEstados(e.target.value)}
+                              placeholder="ex: SP, RJ"
+                              className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                            />
+                            {!formEstados.trim() && (
+                              <p className="mt-1 text-xs text-paper-dim">
+                                Sem estado, esta concessionária não aparece em nenhum
+                                filtro por estado — inclusive em &quot;Solicitar Isenção&quot;.
+                              </p>
+                            )}
                           </div>
 
                           <div>

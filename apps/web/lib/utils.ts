@@ -246,6 +246,30 @@ export function format_estados(estados: string | null): string {
     .join(', ');
 }
 
+/**
+ * Inverso de format_estados: "SP, rj" -> '["SP","RJ"]'.
+ *
+ * O dado gravado sempre foi JSON.stringify(["SP","RJ"]) (ver
+ * prisma/concessionarias-completas-v2.ts) — RequestExemptionModal, no painel
+ * do operador, faz JSON.parse() estrito ao agrupar por estado. Uma string
+ * solta quebra o parse ali, cai num catch silencioso, e a concessionária
+ * some da lista sem erro visível nenhum.
+ */
+export function parse_estados(digitado: string | undefined | null): string | null {
+  if (!digitado) return null;
+
+  const siglas = Array.from(
+    new Set(
+      digitado
+        .split(',')
+        .map(uf => uf.trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  return siglas.length > 0 ? JSON.stringify(siglas) : null;
+}
+
 // As 27 unidades federativas, em ordem alfabética de nome. Fonte única para
 // todos os seletores de estado — a coluna Account.state guarda a sigla.
 export const ESTADOS_BR: ReadonlyArray<{ uf: string; nome: string }> = [
