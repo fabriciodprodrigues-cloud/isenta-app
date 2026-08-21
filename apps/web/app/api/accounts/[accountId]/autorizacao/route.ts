@@ -26,13 +26,7 @@ const schema = z
       });
     }
 
-    if (dados.ativo && !dados.arquivoUrl) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Anexe o termo assinado antes de ativar.',
-        path: ['arquivoUrl'],
-      });
-    }
+    // arquivoUrl é opcional — o termo pode ser ativado sem link/identificador
   });
 
 export async function PUT(
