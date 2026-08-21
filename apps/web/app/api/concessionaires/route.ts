@@ -65,23 +65,43 @@ const schemaCriacao = z.object({
   name: z.string().trim().min(3, 'Nome precisa de ao menos 3 caracteres.'),
   regulador: z.string().trim().min(2, 'Informe o regulador (ex: ANTT, ARTESP, ou "teste").'),
   esfera: z.enum(['FEDERAL', 'ESTADUAL', 'MUNICIPAL']).optional(),
-  // Aceita "SP,RJ" direto — format_estados() ja normaliza tanto lista separada
-  // por virgula quanto JSON na exibicao, entao nao precisa converter aqui.
+  // Aceita "SP,RJ" digitado; convertido pra array JSON antes de gravar (ver
+  // paraJsonDeEstados). O dado real sempre foi JSON.stringify(["SP","RJ"]) —
+  // format_estados() tolera as duas formas na EXIBIÇÃO da tela de admin, mas
+  // o modal de Solicitar Isenção do operador faz JSON.parse() estrito: uma
+  // string solta quebra o parse, cai no catch, e a concessionária some da
+  // lista sem erro visível nenhum.
   estados: z.string().trim().max(200).optional(),
   cnpj: z.string().trim().max(20).optional(),
 });
+
+/** "SP, rj , sp" -> '["SP","RJ"]'. Vazio -> null. */
+function paraJsonDeEstados(bruto: string | undefined): string | null {
+  if (!bruto) return null;
+
+  const siglas = Array.from(
+    new Set(
+      bruto
+        .split(',')
+        .map(s => s.trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  return siglas.length > 0 ? JSON.stringify(siglas) : null;
+}
 
 /**
  * Cria uma concessionária avulsa — sobretudo para teste: o operador monta uma
  * concessionária fictícia, mapeia um canal que ele mesmo controla (o próprio
  * e-mail, por exemplo) pela edição já existente, e consegue rodar o fluxo de
- * solicitação de isenção de ponta a ponta sem tocar em nenhuma das 74
+ * solicitação de isenção de ponta a ponta sem tocar em nenhuma das
  * concessionárias reais.
  *
  * De propósito não recebe canal nem `ativoParaCadastro` aqui: o valor
  * padrão do schema (false) já barra a concessionária nova de qualquer envio
- * real até que um admin mapeie o canal pela tela de edição — a mesma trava
- * que protege as concessionárias reais.
+ * real até que um admin habilite pela tela de edição — a mesma trava que
+ * protege as concessionárias reais.
  */
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -98,7 +118,7 @@ export async function POST(request: NextRequest) {
         name: dados.name,
         regulador: dados.regulador,
         esfera: dados.esfera ?? 'FEDERAL',
-        estados: dados.estados || null,
+        estados: paraJsonDeEstados(dados.estados),
         cnpj: dados.cnpj || null,
       },
       select: {

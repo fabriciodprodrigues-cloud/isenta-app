@@ -54,6 +54,7 @@ export default function GestaoConcessionarias() {
   const [formTipo, setFormTipo] = useState<string>('');
   const [formDestino, setFormDestino] = useState('');
   const [formObs, setFormObs] = useState('');
+  const [formAtivo, setFormAtivo] = useState(false);
 
   const [criando, setCriando] = useState(false);
   const [criandoSalvando, setCriandoSalvando] = useState(false);
@@ -134,6 +135,7 @@ export default function GestaoConcessionarias() {
     setFormTipo(c.tipoCanal ?? '');
     setFormDestino(c.canalIsentos ?? '');
     setFormObs(c.observacoes ?? '');
+    setFormAtivo(c.ativoParaCadastro);
   }
 
   async function salvar(id: string) {
@@ -149,6 +151,7 @@ export default function GestaoConcessionarias() {
           tipoCanal: formTipo || null,
           canalIsentos: formDestino.trim() || null,
           observacoes: formObs.trim() || null,
+          ativoParaCadastro: formAtivo,
         }),
       });
 
@@ -429,6 +432,23 @@ export default function GestaoConcessionarias() {
                             <p className="text-xs text-green">
                               Com canal de e-mail, as solicitações desta concessionária
                               passam a ser enviadas automaticamente.
+                            </p>
+                          )}
+
+                          <label className="flex items-center gap-2 text-sm text-paper">
+                            <input
+                              type="checkbox"
+                              checked={formAtivo}
+                              onChange={e => setFormAtivo(e.target.checked)}
+                              className="h-4 w-4 rounded accent-green"
+                            />
+                            Habilitada para receber solicitações reais
+                          </label>
+                          {!formAtivo && (
+                            <p className="text-xs text-paper-dim">
+                              Desmarcada, esta concessionária não aparece para os
+                              operadores em &quot;Solicitar Isenção&quot; — é o estado
+                              padrão de uma concessionária recém-criada.
                             </p>
                           )}
 
