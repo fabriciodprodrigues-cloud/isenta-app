@@ -1,7 +1,7 @@
 # Isenta — documento de retomada
 
 Para abrir uma conversa nova com o Claude e continuar de onde parou.
-Atualizado em 18/08/2026, commit `7f1eed9`.
+Atualizado em 21/08/2026, commit `6e5b2e6`.
 
 > **Não há nenhuma senha, token ou chave neste arquivo — de propósito.**
 > Um documento de handoff circula: vai para o chat, para o disco, às vezes para
@@ -69,7 +69,8 @@ plano Free a janela é de poucas horas.
 | E-mail dos ofícios | SMTP do próprio órgão |
 | Leitura de CRLV | camada de texto do PDF (grátis) → Claude Opus 5 como reserva |
 | Robô de portal | Playwright, processo separado |
-| Hospedagem | Vercel (site) + Railway (robô) |
+| Relay de e-mail (SMTP/IMAP) | Node/Express num VPS com IP fixo (ver seção 4) |
+| Hospedagem | Vercel (site) + Railway (robô) + VPS Hostinger (relay de e-mail) |
 
 ---
 
@@ -83,14 +84,84 @@ GitHub  fabriciodprodrigues-cloud/isenta-app   (branch: main)
    |             deploy automático a cada push na main
    |
    +--> Railway  projeto "positive-blessing", serviço "@isenta/rpa-worker"
-                 build por Dockerfile, worker sem porta exposta
+   |             build por Dockerfile, worker sem porta exposta
+   |
+   +--> VPS      Hostinger, srv1920691.hstgr.cloud, IP 187.127.62.116
+                 apps/email-service — deploy manual, não automático (ver abaixo)
 
         Neon     projeto "isenta", branch "production" — o mesmo banco
-                 para os dois
+                 para os três
 ```
 
 **Atenção ao usuário do GitHub:** é `fabriciodprodrigues-cloud`, com **"dp"**.
 Errar isso devolve "Repository not found", que parece problema de token e não é.
+
+### VPS de e-mail (`apps/email-service`)
+
+**Por quê existe:** a caixa da Câmara é hospedada na UOL Host, que exige
+autorizar o IP de origem para aceitar SMTP/IMAP. A Vercel não oferece IP de
+saída fixo em funções normais — então SMTP/IMAP não podem falar direto com a
+UOL a partir do site. O VPS existe só para isso: um IP fixo autorizável,
+rodando um relay HTTP em frente ao SMTP/IMAP real.
+
+**Desenho:** sem estado. O relay não guarda nenhuma credencial de órgão — a
+aplicação web já decifra a credencial da conta via `lib/cofre.ts` (um blob só,
+cobrindo SMTP e IMAP); ela chega pronta a cada chamada HTTP, é usada uma vez e
+descartada. Isso evita duplicar a `ENCRYPTION_KEY` numa terceira máquina.
+
+```
+Vercel (decifra a credencial da conta)
+   |  HTTPS + header x-internal-secret
+   v
+nginx (srv1920691.hstgr.cloud, TLS via Let's Encrypt)  — porta 443, pública
+   |  proxy_pass
+   v
+Node/Express (127.0.0.1:3000 — só loopback, nunca exposto direto)
+   |
+   +--> POST /send-email     -> nodemailer -> SMTP do órgão
+   +--> POST /check-emails   -> imapflow   -> IMAP do órgão
+   +--> GET  /health
+```
+
+| Peça | Onde | Observação |
+|---|---|---|
+| Domínio | `srv1920691.hstgr.cloud` | hostname público que a Hostinger já atribui a cada VPS — resolve de verdade via DNS público, não precisou comprar domínio |
+| Certificado | Let's Encrypt, expira 19/11/2026 | renovação automática já configurada pelo certbot (`certbot.timer`) |
+| Processo | PM2, nome `isenta-email` | `pm2 save` + `systemctl enable pm2-root` — sobrevive a reboot |
+| Autenticação | header `x-internal-secret`, comparado a `INTERNAL_SECRET` no `.env` do VPS | sem IP fixo do lado da Vercel para checar a origem, este segredo é a única defesa |
+| Firewall | UFW: só 22 (SSH), 80, 443 | 80 só existe para redirecionar a 443 e para o desafio do certbot |
+
+**Deploy é manual, não automático.** Não há CI/CD para este serviço. Para
+atualizar depois de um push:
+
+```bash
+# no terminal do VPS (painel Hostinger → VPS → gerenciar → botão "terminal")
+cd ~
+curl -fsSL -o src/index.ts https://raw.githubusercontent.com/fabriciodprodrigues-cloud/isenta-app/main/apps/email-service/src/index.ts
+curl -fsSL -o package.json https://raw.githubusercontent.com/fabriciodprodrigues-cloud/isenta-app/main/apps/email-service/package.json
+npm install && npm run build
+pm2 restart isenta-email
+```
+
+O código-fonte vive em `apps/email-service/` no repositório (fonte de
+verdade); o `.gitignore` da raiz já cobre `node_modules/` e `dist/`, então só
+`src/`, `package.json` e `tsconfig.json` são versionados. O `.env` do VPS
+**não** é versionado — vive só no servidor.
+
+**Testar do próprio VPS**, sem nunca expor a senha na tela (usa os nomes das
+variáveis do `.env`, não os valores):
+
+```bash
+set -a; source .env; set +a
+node -e "const s=process.env; fetch('https://srv1920691.hstgr.cloud/check-emails',{method:'POST',headers:{'Content-Type':'application/json','x-internal-secret':s.INTERNAL_SECRET},body:JSON.stringify({host:s.IMAP_HOST,port:Number(s.IMAP_PORT),user:s.IMAP_USER,password:s.IMAP_PASSWORD,limite:5})}).then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2)))"
+```
+
+**Pendente:** a aplicação web ainda não chama este relay. `lib/email-service.ts`
+continua conectando direto no SMTP via nodemailer, o que não funciona para a
+UOL (IP não autorizado). Falta trocar essas chamadas por `fetch()` para
+`https://srv1920691.hstgr.cloud/send-email` (e, quando o `caixa.js` do robô for
+ligado ao fluxo da Motiva, por `/check-emails`), levando o `INTERNAL_SECRET`
+como nova variável de ambiente na Vercel.
 
 ### Configuração do Railway (já aplicada)
 
@@ -146,6 +217,18 @@ Opcionais: `RPA_INTERVALO_MS` (padrão 300000), `RPA_MAX_TENTATIVAS` (3),
 > aplicação cifra as senhas de caixa e de portal; o robô decifra. Se as duas
 > diferirem, tudo salva sem erro e o robô falha na decifragem — e o sintoma
 > aparece como problema do portal.
+
+### Relay de e-mail (VPS)
+
+| Variável | Para quê |
+|---|---|
+| `PORT` | porta interna do Express (3000) — só loopback, o nginx é quem fica público |
+| `INTERNAL_SECRET` | autentica as chamadas da Vercel; gerado com `openssl rand -hex 32` direto no servidor, nunca passou por fora dele |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASSWORD` | só para os testes manuais acima — a rota em si recebe essas credenciais no corpo de cada chamada, não lê do ambiente |
+| `IMAP_HOST` `IMAP_PORT` `IMAP_USER` `IMAP_PASSWORD` | idem, só para teste manual |
+
+O `INTERNAL_SECRET` também precisa existir na Vercel quando a integração do
+ponto pendente acima for feita — hoje só existe no `.env` do VPS.
 
 ### O que a Vercel não devolve
 
@@ -241,6 +324,10 @@ apps/rpa-worker/                   robô (Railway)
   Dockerfile                       imagem oficial do Playwright
 
 apps/worker/                       MORTO — scaffold BullMQ/Redis, substituído
+
+apps/email-service/                relay SMTP/IMAP (VPS, deploy manual — seção 4)
+  src/index.ts                     Express, duas rotas + /health, sem estado
+
 prisma/schema.prisma               12 models
 ```
 
@@ -305,6 +392,31 @@ sai como pathspec inválido. Escreva a mensagem num arquivo e use
 (`handleUpload`), o que exige `BLOB_READ_WRITE_TOKEN` explícito — a Vercel
 passou a usar OIDC por padrão e isso quebra o fluxo.
 
+**A tradução do Chrome também mexe no terminal web do VPS**, não só nos
+painéis. Traduz até rótulo digitado na hora (`echo "dependencies-en:..."`
+virou `"dependências-en:..."` na tela) — é só exibição, o arquivo real no
+disco fica intacto, mas não dá para confiar no que a tela mostra para nada que
+exija precisão (nome de campo, chave JSON). Confirme por comando (`grep -c`,
+`md5sum`), não por leitura visual.
+
+**`client.fetch()` do ImapFlow devolve um gerador assíncrono, não um array.**
+Atribuir direto a uma variável e devolver por JSON serializa vazio — é preciso
+`for await (const msg of client.fetch(...))`. Um rascunho anterior do
+`email-service` tinha esse bug (corrigido no commit `f07f2a3`).
+
+**`certbot --nginx` pode falhar por bloco conflitante, mesmo com o domínio
+resolvendo certo.** No VPS de e-mail, havia dois blocos `server` escutando 80
+— o desafio HTTP-01 caiu no bloco errado e voltou 404. `certbot certonly
+--standalone` (parando o nginx por um instante) contornou; a configuração TLS
+foi então escrita à mão (`apps/email-service/deploy/nginx.conf`).
+
+**Servidor "novo" pode não ser novo.** O VPS de e-mail veio de uma sessão
+anterior com Node, PM2, Docker e nginx já instalados, e até um `email-service`
+parcial já rodando — sem estar versionado no Git e com bugs reais (sem
+`express.json()`, sem autenticação, `package.json` apontando para um arquivo
+que não existia). Antes de seguir um roteiro de "instalar do zero", vale
+conferir o que já está lá.
+
 ---
 
 ## 10. Estado atual
@@ -322,6 +434,24 @@ passou a usar OIDC por padrão e isso quebra o fluxo.
 - Numeração de ofício por órgão, reservada de forma atômica
 - Robô publicado no Railway, online, varrendo a cada 5 minutos
 - Trava do seed contra banco remoto
+- **Relay de e-mail no ar** (VPS Hostinger, `srv1920691.hstgr.cloud`), testado
+  de ponta a ponta em 21/08: SMTP enviou de verdade pela UOL e IMAP leu a
+  caixa real da Câmara. Ver seção 4. **Ainda não chamado pela aplicação web**
+  — é infraestrutura pronta, falta a integração.
+
+### O que a leitura da caixa já revelou
+
+Ao testar o IMAP contra a caixa real (`isenta@camarachapadaodosul.ms.gov.br`),
+apareceram e-mails reais do portal da Motiva — ofícios já foram enviados antes
+e o portal está respondendo:
+
+- Remetente: `no-reply-isentos@motiva.com.br`
+- Assunto: `[Portal de Isentos] Nova atualização! Processo #0000042681`
+  (um número de processo por e-mail)
+
+Isso ainda não fecha o item D abaixo (falta ler o **corpo** da mensagem para
+achar o link de confirmação), mas já elimina a maior incógnita: o remetente e
+o padrão de assunto para filtrar.
 
 ### Não funciona / não existe
 
@@ -333,9 +463,12 @@ passou a usar OIDC por padrão e isso quebra o fluxo.
   documento de verdade. Se o layout diferir, placa e RENAVAM ficam vazios e o
   sistema cai para a leitura por imagem — não entrega dado torto, mas passa a
   custar ~US$ 0,04 por leitura.
-- **`caixa.js` não está ligado ao fluxo da Motiva.** Falta saber o domínio
-  remetente e o formato da mensagem do portal — só se descobre com um cadastro
-  real.
+- **A aplicação web não usa o relay de e-mail ainda.** `lib/email-service.ts`
+  continua conectando direto no SMTP, o que a UOL bloqueia por IP não
+  autorizado. Ver seção 4, "Pendente".
+- **`caixa.js` não está ligado ao fluxo da Motiva.** Já se sabe o remetente e
+  o formato do assunto (acima); falta o corpo da mensagem (onde deve estar o
+  link de confirmação) e a integração de fato.
 - Delegação OAuth (`DELEGACAO`) não implementada — `gmail.send` exigiria
   verificação de app no Google.
 - Termos de Uso do portal da Motiva nunca lidos.
@@ -375,47 +508,58 @@ Em ordem de dependência — cada bloco destrava o seguinte.
 
 ### B. Envio por e-mail — o caminho que já existe
 
-4. Obter as credenciais **SMTP** da Câmara Municipal de Chapadão do Sul com o
-   TI deles, mais uma **caixa dedicada à isenção** (não a institucional
-   principal).
-5. Cadastrar no onboarding do órgão, passo de e-mail. A tela testa a conexão
-   antes de guardar.
-6. Subir o **timbre** e preencher cidade de emissão, cargo do responsável e
+4. ~~Obter as credenciais SMTP da Câmara~~ — **feito.** A caixa
+   `isenta@camarachapadaodosul.ms.gov.br` existe (UOL Host, SMTP
+   `smtp.suite.uol` porta 587 STARTTLS, IMAP `imap.suite.uol` porta 993
+   SSL/TLS) e foi testada de verdade em 21/08 via o relay do VPS (seção 4).
+5. **Ligar a aplicação web ao relay** — troca `lib/email-service.ts` de
+   nodemailer direto para `fetch()` no relay do VPS. Sem isso o envio pela
+   Vercel continua falhando (IP não autorizado pela UOL). Este é o próximo
+   passo real, e o único que falta neste bloco.
+6. Cadastrar a caixa no onboarding do órgão, passo de e-mail (a tela testa a
+   conexão antes de guardar — mas vai testar contra o relay, não contra a UOL
+   direto, depois do passo 5).
+7. Subir o **timbre** e preencher cidade de emissão, cargo do responsável e
    método de assinatura — sem isso o envio fica bloqueado por desenho.
-7. Enviar o primeiro ofício real para uma concessionária de canal por e-mail e
+8. Enviar o primeiro ofício real para uma concessionária de canal por e-mail e
    acompanhar a resposta.
 
 Concluído este bloco, a plataforma entrega valor sem depender do robô.
 
 ### C. Robô de portal
 
-8. Criar a conta do órgão em `isentos.ccrpagamentos.com.br` — manual, opção
+9. Criar a conta do órgão em `isentos.ccrpagamentos.com.br` — manual, opção
    "Para sua empresa", CNPJ do órgão. O código de seis dígitos chega por e-mail.
-9. Guardar essa conta no passo 7 do onboarding (Portais).
-10. Cadastrar um veículo numa concessionária do grupo Motiva (AutoBAn, MINAS
+10. Guardar essa conta no passo 7 do onboarding (Portais).
+11. Cadastrar um veículo numa concessionária do grupo Motiva (AutoBAn, MINAS
     SP, Pantanal, PRVias, RioSP, Sorocabana, ViaCosteira, ViaSul — as oito são
     cobertas por uma conta só).
-11. Acompanhar a primeira execução pelas capturas de tela que o robô grava.
+12. Acompanhar a primeira execução pelas capturas de tela que o robô grava.
     Esperar que algo quebre: é a primeira vez contra o portal real.
 
 ### D. Leitura da caixa (IMAP)
 
-12. Com a caixa dedicada criada no passo 4, preencher também os campos de IMAP
-    no mesmo passo do onboarding.
-13. Descobrir, no e-mail do passo 8, **qual o domínio remetente do portal e como
-    o código aparece na mensagem**. Com isso, ligar `apps/rpa-worker/src/caixa.js`
-    ao fluxo da Motiva — hoje o módulo existe e está testado, mas não é chamado.
-14. Fechar o critério 6 da especificação: ler o link de confirmação que a
+13. Com a caixa já criada (item 4), preencher também os campos de IMAP no
+    onboarding do órgão — o relay do VPS já está pronto para essas chamadas.
+14. ~~Descobrir o domínio remetente do portal~~ — **parcialmente feito.** É
+    `no-reply-isentos@motiva.com.br`, assunto
+    `[Portal de Isentos] Nova atualização! Processo #NNNNNNNNNN` (visto em
+    21/08, lendo a caixa real via o relay). Falta olhar o **corpo** da
+    mensagem — hoje `check-emails` só traz remetente/assunto/data (envelope),
+    não o corpo. Com o formato do corpo em mãos, ligar
+    `apps/rpa-worker/src/caixa.js` ao fluxo da Motiva — o módulo existe e foi
+    testado, mas não é chamado.
+15. Fechar o critério 6 da especificação: ler o link de confirmação que a
     concessionária envia após o ofício.
 
 ### E. Para operar de verdade
 
-15. Telas de **Relatórios** e **Configurações** (hoje esqueleto).
-16. Rotina de backup automática — hoje `backup-dados.js` é manual, e foi
+16. Telas de **Relatórios** e **Configurações** (hoje esqueleto).
+17. Rotina de backup automática — hoje `backup-dados.js` é manual, e foi
     justamente a ausência disso que tornou o apagamento irreversível.
-17. Alertas de vencimento por e-mail rodando pelo cron (`/api/cron/alertas`
+18. Alertas de vencimento por e-mail rodando pelo cron (`/api/cron/alertas`
     existe; confirmar se o agendamento está ativo na Vercel).
-18. **Cobrança** — se a plataforma for cobrar dos órgãos, nada disso existe.
+19. **Cobrança** — se a plataforma for cobrar dos órgãos, nada disso existe.
 
 ---
 
@@ -433,6 +577,13 @@ Sobre a caixa do órgão: credencial de SMTP permite **enviar**; credencial de
 IMAP permite **ler tudo** o que estiver na conta. Numa câmara municipal isso
 alcançaria ofícios, dados de servidores e processos administrativos. O projeto
 assume uma caixa criada só para isenção.
+
+**No VPS de e-mail:** `npm audit` reportou 1 vulnerabilidade de gravidade alta
+em `apps/email-service` em 21/08 — não investigada ainda, não rodei
+`audit fix --force` (troca versão major sem revisar, risco desnecessário sem
+necessidade imediata). Rever antes de considerar o relay definitivamente
+fechado. Acesso root ao VPS é só por senha/painel da Hostinger (não há chave
+SSH própria configurada) — se isso mudar, documentar aqui.
 
 ---
 
