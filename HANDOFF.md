@@ -1,7 +1,7 @@
 # Isenta — documento de retomada
 
 Para abrir uma conversa nova com o Claude e continuar de onde parou.
-Atualizado em 21/08/2026, commit `6e5b2e6`.
+Atualizado em 21/08/2026, commit `06b404e`.
 
 > **Não há nenhuma senha, token ou chave neste arquivo — de propósito.**
 > Um documento de handoff circula: vai para o chat, para o disco, às vezes para
@@ -52,6 +52,27 @@ Desde então:
 **Rode o backup antes de qualquer comando que escreva no banco** — seed,
 `migrate reset`, `db push`. E não conte com restauração pontual do Neon: no
 plano Free a janela é de poucas horas.
+
+### O segundo incidente: build quebrado por 8 horas sem ninguém notar
+
+Em **21/08/2026**, o commit `0097213` ("Adicionar opções de editar, congelar
+e excluir órgãos") introduziu um erro de sintaxe real — estado duplicado no
+mesmo escopo, um bloco JSX inteiro colado duas vezes fora do `return()`, uma
+`<div>` nunca fechada. **Todo deploy a partir daquele commit falhou** —
+`pnpm run build` retornava erro de compilação — e a produção continuou
+servindo a última build boa, sem nenhuma das mudanças das 8 horas seguintes.
+Ninguém percebeu, porque nada aqui monitora deploy falho.
+
+**Verifique isto sempre que retomar o projeto:** abra
+`vercel.com/infinity20/isenta-app-web/deployments` e confira se o deployment
+mais recente está `Ready` (verde) — não só se o `git push` foi aceito. Um
+push aceito não significa que o site mudou.
+
+O commit quebrado também importava `Dialog`, `DropdownMenu` e `Label` de
+`@/components/ui/`, que **nunca foram criados** — só compilava por acidente
+antes da duplicação virar erro fatal (TypeScript não confere imports
+inexistentes até o arquivo ser processado no build). Antes de importar um
+componente de UI, confira que o arquivo existe em `apps/web/components/ui/`.
 
 ---
 
@@ -156,12 +177,16 @@ set -a; source .env; set +a
 node -e "const s=process.env; fetch('https://srv1920691.hstgr.cloud/check-emails',{method:'POST',headers:{'Content-Type':'application/json','x-internal-secret':s.INTERNAL_SECRET},body:JSON.stringify({host:s.IMAP_HOST,port:Number(s.IMAP_PORT),user:s.IMAP_USER,password:s.IMAP_PASSWORD,limite:5})}).then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2)))"
 ```
 
-**Pendente:** a aplicação web ainda não chama este relay. `lib/email-service.ts`
-continua conectando direto no SMTP via nodemailer, o que não funciona para a
-UOL (IP não autorizado). Falta trocar essas chamadas por `fetch()` para
-`https://srv1920691.hstgr.cloud/send-email` (e, quando o `caixa.js` do robô for
-ligado ao fluxo da Motiva, por `/check-emails`), levando o `INTERNAL_SECRET`
-como nova variável de ambiente na Vercel.
+**Ligado.** Desde o commit `1e73d3b` (21/08), `enviarOficioDeIsencao()` em
+`lib/email-service.ts` chama `POST {EMAIL_RELAY_URL}/send-email` em vez de
+abrir SMTP direto — o `INTERNAL_SECRET` do VPS está configurado na Vercel
+como `EMAIL_RELAY_SECRET` (mesmo valor, nome diferente dos dois lados de
+propósito — evita colar a variável errada por engano). O relay ganhou suporte
+a anexo (base64) e `replyTo` no mesmo commit; sem isso o ofício sairia sem o
+CRLV, que é o próprio motivo do e-mail. `check-emails` (para quando `caixa.js`
+for ligado ao fluxo da Motiva) ainda não é chamado pela aplicação web — só o
+envio está integrado, a leitura da caixa continua um passo futuro (bloco D da
+seção 11).
 
 ### Configuração do Railway (já aplicada)
 
@@ -197,6 +222,8 @@ para a pasta do worker, o arquivo fica fora do contexto de build e o
 | `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASSWORD` `SMTP_SECURE` | Resend | Vercel |
 | `CRON_SECRET` | protege `/api/cron/alertas` | Vercel |
 | `WEBHOOK_SECRET` | protege o webhook de resposta | Vercel |
+| `EMAIL_RELAY_URL` | endpoint do relay de e-mail (VPS) | `https://srv1920691.hstgr.cloud` — Vercel, configurada em 21/08 |
+| `EMAIL_RELAY_SECRET` | autentica a Vercel perante o relay | **tem que ser igual à `INTERNAL_SECRET` do `.env` do VPS** — Vercel (Sensitive) |
 
 `ANTHROPIC_API_KEY` é opcional de propósito: a leitura pela camada de texto do
 PDF não usa modelo nenhum. Sem a chave, um CRLV digitalizado (foto) apenas não
@@ -223,12 +250,16 @@ Opcionais: `RPA_INTERVALO_MS` (padrão 300000), `RPA_MAX_TENTATIVAS` (3),
 | Variável | Para quê |
 |---|---|
 | `PORT` | porta interna do Express (3000) — só loopback, o nginx é quem fica público |
-| `INTERNAL_SECRET` | autentica as chamadas da Vercel; gerado com `openssl rand -hex 32` direto no servidor, nunca passou por fora dele |
+| `INTERNAL_SECRET` | autentica as chamadas da Vercel; gerado com `openssl rand -hex 32` direto no servidor. Mesmo valor está na Vercel como `EMAIL_RELAY_SECRET` (seção 5) |
 | `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASSWORD` | só para os testes manuais acima — a rota em si recebe essas credenciais no corpo de cada chamada, não lê do ambiente |
 | `IMAP_HOST` `IMAP_PORT` `IMAP_USER` `IMAP_PASSWORD` | idem, só para teste manual |
 
-O `INTERNAL_SECRET` também precisa existir na Vercel quando a integração do
-ponto pendente acima for feita — hoje só existe no `.env` do VPS.
+**Se o `INTERNAL_SECRET` precisar ser rotacionado** (vazamento, rotina de
+segurança): gerar um novo no VPS (`openssl rand -hex 32`), sobrescrever a
+linha no `.env`, reiniciar (`pm2 restart isenta-email`), e atualizar
+`EMAIL_RELAY_SECRET` na Vercel com o mesmo valor — os dois lados têm que
+bater exatamente, senão todo envio de ofício por e-mail passa a falhar com
+401 do relay.
 
 ### O que a Vercel não devolve
 
@@ -434,10 +465,13 @@ conferir o que já está lá.
 - Numeração de ofício por órgão, reservada de forma atômica
 - Robô publicado no Railway, online, varrendo a cada 5 minutos
 - Trava do seed contra banco remoto
-- **Relay de e-mail no ar** (VPS Hostinger, `srv1920691.hstgr.cloud`), testado
-  de ponta a ponta em 21/08: SMTP enviou de verdade pela UOL e IMAP leu a
-  caixa real da Câmara. Ver seção 4. **Ainda não chamado pela aplicação web**
-  — é infraestrutura pronta, falta a integração.
+- **Relay de e-mail no ar e ligado à aplicação web** (VPS Hostinger,
+  `srv1920691.hstgr.cloud`), testado de ponta a ponta em 21/08: SMTP enviou
+  de verdade pela UOL, IMAP leu a caixa real da Câmara, e o envio de ofício
+  já passa por ele em produção. Ver seção 4.
+- **Editar, congelar/ativar e excluir órgão**, na listagem de admin — corrigido
+  em 21/08 depois de ficar quebrado por 8 horas (ver seção 2). Reaproveita a
+  rota `PUT /api/accounts/[id]` que já aceita `status`.
 
 ### O que a leitura da caixa já revelou
 
@@ -463,9 +497,6 @@ o padrão de assunto para filtrar.
   documento de verdade. Se o layout diferir, placa e RENAVAM ficam vazios e o
   sistema cai para a leitura por imagem — não entrega dado torto, mas passa a
   custar ~US$ 0,04 por leitura.
-- **A aplicação web não usa o relay de e-mail ainda.** `lib/email-service.ts`
-  continua conectando direto no SMTP, o que a UOL bloqueia por IP não
-  autorizado. Ver seção 4, "Pendente".
 - **`caixa.js` não está ligado ao fluxo da Motiva.** Já se sabe o remetente e
   o formato do assunto (acima); falta o corpo da mensagem (onde deve estar o
   link de confirmação) e a integração de fato.
@@ -491,6 +522,20 @@ Os registros de demonstração são resíduo do seed acidental. Limpe com:
 node scripts/limpar-dados-demo.js
 ```
 
+### Há um `git stash` pendente
+
+Ao corrigir o build quebrado (seção 2), uma reescrita antiga e não commitada
+de `orgaos/page.tsx` foi guardada em vez de descartada — ela reescrevia a
+página sem depender de `Dialog`/`DropdownMenu`/`Label` (que nunca existiram),
+mas removia a ação de congelar/ativar por completo. A correção final preservou
+essa funcionalidade por outro caminho (seção 2), então esse stash não deveria
+mais ser necessário. Confirme e descarte:
+
+```bash
+git stash list
+git stash drop   # depois de confirmar que não há nada ali que você queira
+```
+
 ---
 
 ## 11. O que falta para finalizar a plataforma
@@ -512,13 +557,16 @@ Em ordem de dependência — cada bloco destrava o seguinte.
    `isenta@camarachapadaodosul.ms.gov.br` existe (UOL Host, SMTP
    `smtp.suite.uol` porta 587 STARTTLS, IMAP `imap.suite.uol` porta 993
    SSL/TLS) e foi testada de verdade em 21/08 via o relay do VPS (seção 4).
-5. **Ligar a aplicação web ao relay** — troca `lib/email-service.ts` de
-   nodemailer direto para `fetch()` no relay do VPS. Sem isso o envio pela
-   Vercel continua falhando (IP não autorizado pela UOL). Este é o próximo
-   passo real, e o único que falta neste bloco.
-6. Cadastrar a caixa no onboarding do órgão, passo de e-mail (a tela testa a
-   conexão antes de guardar — mas vai testar contra o relay, não contra a UOL
-   direto, depois do passo 5).
+5. ~~Ligar a aplicação web ao relay~~ — **feito** (commit `1e73d3b`,
+   21/08). `enviarOficioDeIsencao()` chama o relay em vez de nodemailer
+   direto.
+6. **Cadastrar a caixa no onboarding do órgão**, passo de e-mail. A tela testa
+   a conexão antes de guardar — mas hoje esse teste (`caixa-entrada.ts`)
+   ainda conecta direto na UOL, não passa pelo relay, então pode falhar por
+   IP mesmo com o relay funcionando. Vale conferir isso antes de usar em
+   produção: se travar aqui, o teste de conexão do onboarding é o próximo
+   ponto a ligar ao relay, não o envio em si. Este é o próximo passo real
+   deste bloco.
 7. Subir o **timbre** e preencher cidade de emissão, cargo do responsável e
    método de assinatura — sem isso o envio fica bloqueado por desenho.
 8. Enviar o primeiro ofício real para uma concessionária de canal por e-mail e
