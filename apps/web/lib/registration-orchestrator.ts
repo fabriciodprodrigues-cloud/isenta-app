@@ -51,8 +51,18 @@ async function carregarTimbre(pathname: string): Promise<string | null> {
       return null;
     }
 
-    const buffer = Buffer.from(await new Response(resultado.stream).arrayBuffer());
     const tipo = resultado.blob.contentType ?? 'image/png';
+
+    // Um timbre com mimetype fora de imagem (PDF, DOCX) vira um <img src>
+    // inválido e corrompe o HTML do ofício inteiro — já aconteceu por uma
+    // falha na validação do upload (ver identidade/timbre/route.ts). Ignora
+    // e segue sem timbre em vez de quebrar o envio.
+    if (!tipo.startsWith('image/')) {
+      console.error(`Timbre com mimetype inválido, ignorado: ${pathname} (${tipo})`);
+      return null;
+    }
+
+    const buffer = Buffer.from(await new Response(resultado.stream).arrayBuffer());
 
     return `data:${tipo};base64,${buffer.toString('base64')}`;
   } catch (erro) {

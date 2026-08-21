@@ -10,12 +10,11 @@ export const dynamic = 'force-dynamic';
 // 4 MB cabe no limite de corpo das funções da Vercel, então este envio pode
 // passar pela API — diferente do CRLV, que exige upload direto.
 const TAMANHO_MAXIMO = 4 * 1024 * 1024;
-const TIPOS_MIME = [
-  'image/png',
-  'image/jpeg',
-  'application/pdf',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-];
+// Só imagem: o timbre vai embutido como <img> no HTML do ofício (ver
+// carregarTimbre em lib/registration-orchestrator.ts). PDF ou DOCX aqui
+// aceitavam o upload mas viravam um data URI com o mimetype errado,
+// corrompendo o e-mail inteiro na hora do envio.
+const TIPOS_MIME = ['image/png', 'image/jpeg'];
 
 export async function POST(
   request: NextRequest,
