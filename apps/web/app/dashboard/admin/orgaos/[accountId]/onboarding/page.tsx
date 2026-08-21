@@ -871,19 +871,15 @@ function PassoTimbre({
   return (
     <div className="space-y-5">
       <p className="text-sm text-paper-dim">
-        O timbre aparece no topo do ofício. Envie em PNG ou JPG, até 4 MB —
-        clientes de e-mail não renderizam PDF embutido.
+        O timbre aparece no topo do ofício. Envie em PNG, JPG, PDF ou Word, até 4 MB.
       </p>
 
       {orgao.timbreUrl && (
         <div className="rounded border border-white/10 bg-ink-700/40 p-4">
           <p className="mb-2 text-xs text-paper-dim">Timbre atual</p>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/accounts/${accountId}/identidade/timbre`}
-            alt="Papel timbrado"
-            className="max-h-32 rounded bg-white p-2"
-          />
+          <a href={`/api/accounts/${accountId}/identidade/timbre`} target="_blank" className="text-green hover:underline">
+            Visualizar arquivo atual
+          </a>
         </div>
       )}
 
@@ -893,7 +889,7 @@ function PassoTimbre({
           <input
             ref={inputRef}
             type="file"
-            accept="image/png,image/jpeg"
+            accept="image/png,image/jpeg,application/pdf,.docx"
             className="hidden"
             disabled={salvando}
             onChange={e => {

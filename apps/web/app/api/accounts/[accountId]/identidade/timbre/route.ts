@@ -10,7 +10,12 @@ export const dynamic = 'force-dynamic';
 // 4 MB cabe no limite de corpo das funções da Vercel, então este envio pode
 // passar pela API — diferente do CRLV, que exige upload direto.
 const TAMANHO_MAXIMO = 4 * 1024 * 1024;
-const TIPOS_MIME = ['image/png', 'image/jpeg'];
+const TIPOS_MIME = [
+  'image/png',
+  'image/jpeg',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 export async function POST(
   request: NextRequest,
