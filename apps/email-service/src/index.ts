@@ -167,6 +167,9 @@ app.post('/check-emails', exigirSegredo, async (req: Request<{}, {}, CorpoLeitur
   }
 });
 
-app.listen(porta, () => {
-  console.log(`Serviço de e-mail (Isenta) rodando na porta ${porta}`);
+// Só em loopback: quem fala com este serviço é o nginx local, que faz proxy
+// reverso com TLS. Escutar em 0.0.0.0 exporia a porta 3000 sem certificado
+// para qualquer um na internet, mesmo com o firewall ligado por engano tarde.
+app.listen(porta, '127.0.0.1', () => {
+  console.log(`Serviço de e-mail (Isenta) rodando em 127.0.0.1:${porta}`);
 });
