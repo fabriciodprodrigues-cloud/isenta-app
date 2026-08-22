@@ -288,10 +288,14 @@ export async function enviarOficioDeIsencao({
       }),
       // O relay já tem seu próprio timeout de SMTP; este é só para não
       // deixar a função da Vercel pendurada se o VPS ficar inacessível.
-      // Reduzido de 45s para 30s: quando há modelo de ofício, essa chamada
-      // roda depois de converterDocxParaPdf (até 20s) na mesma requisição de
-      // até 60s de /api/registrations/send — precisa sobrar margem.
-      signal: AbortSignal.timeout(30_000),
+      //
+      // Já tentei reduzir para 30s para abrir espaço para converterDocxParaPdf
+      // na mesma requisição de 60s (/api/registrations/send) — na prática o
+      // envio real para a caixa da Câmara de Chapadão do Sul precisou de mais
+      // que 30s e abortou. A conversão em si é rápida (~4s observado em
+      // teste real, bem abaixo do teto de 20s dela), então sobra folga de
+      // verdade para manter os 45s originais aqui.
+      signal: AbortSignal.timeout(45_000),
     });
   } catch (erro) {
     throw new RelayDeEmailFalhouError(
