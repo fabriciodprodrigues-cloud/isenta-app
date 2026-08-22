@@ -120,10 +120,14 @@ async function processar(registro, navegador) {
   try {
     await motiva.baixarDocumento(veiculo.documents[0].url, arquivoCrlv, fs);
 
-    await motiva.entrar(page, {
-      usuario: credencialPortal.usuario,
-      senha,
-    });
+    await motiva.entrar(
+      page,
+      {
+        usuario: credencialPortal.usuario,
+        senha,
+      },
+      capturar
+    );
 
     await motiva.criarSolicitacao(
       page,

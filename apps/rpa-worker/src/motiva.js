@@ -65,7 +65,7 @@ async function baixarDocumento(pathname, destino, fs) {
   return destino;
 }
 
-async function entrar(page, credencial) {
+async function entrar(page, credencial, capturar) {
   await page.goto(URL_PORTAL, { waitUntil: 'domcontentloaded' });
 
   await page.getByRole('button', { name: /acessar a plataforma|entrar/i }).first().click();
@@ -93,6 +93,9 @@ async function entrar(page, credencial) {
       'Login não concluiu. Verifique usuário e senha do portal, ou se a conta pede verificação adicional.'
     );
   }
+
+  console.log('  pós-login em:', page.url());
+  if (capturar) await capturar('00-pos-login');
 }
 
 /**
@@ -109,6 +112,7 @@ async function criarSolicitacao(page, dados, capturar) {
   // confirmado numa execução real.
   const origemAutenticada = new URL(page.url()).origin;
 
+  console.log('  indo para:', `${origemAutenticada}/solicitacao`);
   await page.goto(`${origemAutenticada}/solicitacao`, { waitUntil: 'domcontentloaded' });
   await capturar('01-inicio');
 
