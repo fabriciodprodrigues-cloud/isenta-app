@@ -56,9 +56,14 @@ export default async function VehicleDetailsPage({
             {vehicle.account?.name}
           </p>
         </div>
-        <Link href="/dashboard/vehicles">
-          <Button variant="secondary">Voltar</Button>
-        </Link>
+        <div className="flex gap-3">
+          <Link href={`/dashboard/vehicles/${vehicle.id}/edit`}>
+            <Button variant="secondary">Editar</Button>
+          </Link>
+          <Link href="/dashboard/vehicles">
+            <Button variant="secondary">Voltar</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
