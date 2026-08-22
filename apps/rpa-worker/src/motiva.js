@@ -128,20 +128,38 @@ async function criarSolicitacao(page, dados, capturar) {
   await page.goto(`${origemAutenticada}/solicitacao`, { waitUntil: 'domcontentloaded' });
   await capturar('01-inicio');
 
-  // ---- Passo 1: concessionária ----
-  await page.getByRole('combobox').first().click();
-  await page.getByText(concessionariaRotulo, { exact: true }).click();
-  await capturar('02-concessionaria');
-  await page.getByRole('button', { name: /continuar/i }).click();
+  // Uma tentativa anterior interrompida no meio do preenchimento deixa um
+  // rascunho salvo no portal: a próxima visita a /solicitacao mostra um
+  // modal perguntando se quer continuar de onde parou ou reiniciar, em vez
+  // de ir direto pro formulário. Confirmado ao vivo (com captura de tela)
+  // que clicar em "Continuar" pula direto pro passo em que o rascunho
+  // parou, com os campos anteriores preservados.
+  const modalRascunho = page.getByText(/seja bem.?vindo/i);
+  if (await modalRascunho.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await page.getByRole('button', { name: /^continuar$/i }).click();
+  }
 
-  // ---- Passo 2: tipo de isenção ----
-  // O portal separa em Veículo Oficial e Veículo Locado, que é exatamente a
-  // distinção que já guardamos em Vehicle.type.
-  const rotuloTipo =
-    veiculo.type === 'locado' ? /ve[íi]culo locado/i : /ve[íi]culo oficial/i;
-  await page.getByText(rotuloTipo).first().click();
-  await capturar('03-tipo');
-  await page.getByRole('button', { name: /continuar/i }).click();
+  const passoDocumentoJaVisivel = await page
+    .getByText(/documento do ve[íi]culo/i)
+    .isVisible({ timeout: 3_000 })
+    .catch(() => false);
+
+  if (!passoDocumentoJaVisivel) {
+    // ---- Passo 1: concessionária ----
+    await page.getByRole('combobox').first().click();
+    await page.getByText(concessionariaRotulo, { exact: true }).click();
+    await capturar('02-concessionaria');
+    await page.getByRole('button', { name: /continuar/i }).click();
+
+    // ---- Passo 2: tipo de isenção ----
+    // O portal separa em Veículo Oficial e Veículo Locado, que é exatamente
+    // a distinção que já guardamos em Vehicle.type.
+    const rotuloTipo =
+      veiculo.type === 'locado' ? /ve[íi]culo locado/i : /ve[íi]culo oficial/i;
+    await page.getByText(rotuloTipo).first().click();
+    await capturar('03-tipo');
+    await page.getByRole('button', { name: /continuar/i }).click();
+  }
 
   // ---- Passo 3: documento ----
   // O card "Documento do Veículo" (com o campo de upload) só aparece depois
