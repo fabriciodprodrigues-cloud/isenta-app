@@ -159,6 +159,8 @@ async function criarSolicitacao(page, dados, capturar) {
     await page.getByText(rotuloTipo).first().click();
     await capturar('03-tipo');
     await page.getByRole('button', { name: /continuar/i }).click();
+    await page.waitForTimeout(2_000);
+    await capturar('03b-apos-continuar');
   }
 
   // ---- Passo 3: documento ----
@@ -167,7 +169,7 @@ async function criarSolicitacao(page, dados, capturar) {
   // direto encontrava 0 inputs, confirmado numa execução real (o texto da
   // página trazia só os links de ajuda e os botões, sem o card). Espera o
   // card renderizar antes de mexer no input.
-  await page.getByText('Documento do Veículo', { exact: true }).waitFor({ timeout: 30_000 });
+  await page.getByText('Documento do Veículo', { exact: true }).waitFor({ timeout: 60_000 });
 
   const totalInputsArquivo = await page.locator('input[type="file"]').count();
   console.log('  inputs[type=file] após o card aparecer:', totalInputsArquivo);
