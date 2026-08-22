@@ -239,7 +239,11 @@ async function criarSolicitacao(page, dados, capturar) {
 
   await page.locator('input[name="applicantAddressCity"]').fill(orgao.city);
 
-  await page.locator('input[name="plate"]').fill(veiculo.plate);
+  // fill() seta o valor de uma vez só, e a máscara do campo de placa perde o
+  // último caractere nesse caso (confirmado numa execução real: "SMF-6F91"
+  // virava "SMF6F9" na tela) -- provavelmente a máscara só reage a eventos
+  // de teclado de verdade. pressSequentially digita caractere por caractere.
+  await page.locator('input[name="plate"]').pressSequentially(veiculo.plate, { delay: 50 });
 
   // Ao digitar a placa, o portal consulta bases externas e pode encontrar uma
   // TAG Sem Parar. A pergunta só aparece nesse caso.
