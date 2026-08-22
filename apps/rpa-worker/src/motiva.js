@@ -116,30 +116,24 @@ async function entrar(page, credencial, capturar) {
 async function criarSolicitacao(page, dados, capturar) {
   const { concessionariaRotulo, veiculo, orgao, temTagNoSistema, arquivoCrlv } = dados;
 
-  // Usa a origem de onde o login deixou a página, não URL_PORTAL fixo: o
-  // Azure B2C pode devolver pra ccrpagamentos.com.br OU motivapagamentos.com.br
-  // (ver entrar()), e a sessão só vale no domínio onde o cookie foi setado.
-  // Forçar o domínio fixo aqui derrubava a sessão silenciosamente — o goto
-  // caía na home deslogada e o clique no combobox nunca achava nada,
-  // confirmado numa execução real.
-  const origemAutenticada = new URL(page.url()).origin;
+  console.log('  página pós-login:', page.url());
 
-  console.log('  indo para:', `${origemAutenticada}/solicitacao`);
-  await page.goto(`${origemAutenticada}/solicitacao`, { waitUntil: 'domcontentloaded' });
+  // Navegar direto pra /solicitacao (hard goto) causava EXISTING_DRAFT_ERROR
+  // ao chegar no passo de documento, mesmo reiniciando o rascunho -- só
+  // reproduzível pelo robô, não manualmente. Confirmado pelo usuário: clicar
+  // no botão "Nova solicitação" da lista (navegação da própria SPA, sem
+  // reload de página) e depois "Continuar" no modal de rascunho funciona
+  // normalmente. Faz exatamente esse caminho em vez do goto direto.
+  await page.getByRole('button', { name: /nova solicita[çc][ãa]o/i }).click();
   await capturar('01-inicio');
 
   // Uma tentativa anterior interrompida no meio do preenchimento deixa um
-  // rascunho salvo no portal: a próxima visita a /solicitacao mostra um
+  // rascunho salvo no portal: o clique em "Nova solicitação" mostra um
   // modal perguntando se quer continuar de onde parou ou reiniciar, em vez
-  // de ir direto pro formulário. "Continuar" chegou a funcionar uma vez,
-  // mas depois de várias tentativas seguidas passou a quebrar com
-  // EXISTING_DRAFT_ERROR ao tentar carregar o passo de documento --
-  // provavelmente rascunhos conflitantes acumulados pelos próprios testes.
-  // "Reiniciar" descarta o rascunho travado (não afeta nada já enviado) e
-  // sempre deixa a página num estado limpo e previsível.
+  // de ir direto pro formulário.
   const modalRascunho = page.getByText(/seja bem.?vindo/i);
   if (await modalRascunho.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await page.getByRole('button', { name: /^reiniciar$/i }).click();
+    await page.getByRole('button', { name: /^continuar$/i }).click();
   }
 
   const passoDocumentoJaVisivel = await page
