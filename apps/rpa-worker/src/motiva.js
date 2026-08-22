@@ -144,6 +144,12 @@ async function criarSolicitacao(page, dados, capturar) {
   await page.getByRole('button', { name: /continuar/i }).click();
 
   // ---- Passo 3: documento ----
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+  const totalInputsArquivo = await page.locator('input[type="file"]').count();
+  console.log('  inputs[type=file] na página:', totalInputsArquivo);
+  if (totalInputsArquivo === 0) {
+    console.log('  texto da página:', (await page.innerText('body')).slice(0, 1500));
+  }
   await page.setInputFiles('input[type="file"]', arquivoCrlv);
   // Espera a confirmação visual de "1 de 1" antes de seguir; sem isso o
   // Continuar pode ser clicado enquanto o upload ainda corre.
