@@ -131,7 +131,7 @@ ${orgao.responsiblePhone} · ${orgao.responsibleEmail}
 
 ---
 Ofício nº ${numeroOficio} · Protocolo ${protocolo}
-Respostas a este e-mail são recebidas pelo responsável indicado acima.
+Respostas a este e-mail chegam à caixa institucional do órgão e são acompanhadas pelo sistema Isenta.
 `.trim();
 
   // ---------- versão em HTML ----------
@@ -253,7 +253,7 @@ Respostas a este e-mail são recebidas pelo responsável indicado acima.
 
     <div style="margin-top:26px;padding-top:14px;border-top:1px solid #d8e0db;font-size:11.5px;color:#8a968f;line-height:1.5;">
       Ofício nº ${esc(numeroOficio)} · Protocolo ${esc(protocolo)}<br>
-      Respostas a este e-mail são recebidas pelo responsável indicado acima.
+      Respostas a este e-mail chegam à caixa institucional do órgão e são acompanhadas pelo sistema Isenta.
     </div>
 
   </div>
@@ -291,7 +291,7 @@ ${orgao.responsibleRole || 'Responsável pela frota'} — ${razao}
 
 ---
 Ofício nº ${numeroOficio} · Protocolo ${protocolo}
-Respostas a este e-mail são recebidas pelo responsável indicado acima.
+Respostas a este e-mail chegam à caixa institucional do órgão e são acompanhadas pelo sistema Isenta.
 `.trim();
 
   const html = `<!DOCTYPE html>
@@ -315,7 +315,7 @@ Respostas a este e-mail são recebidas pelo responsável indicado acima.
     </div>
     <div style="margin-top:22px;padding-top:14px;border-top:1px solid #d8e0db;font-size:11.5px;color:#8a968f;line-height:1.5;">
       Ofício nº ${esc(numeroOficio)} · Protocolo ${esc(protocolo)}<br>
-      Respostas a este e-mail são recebidas pelo responsável indicado acima.
+      Respostas a este e-mail chegam à caixa institucional do órgão e são acompanhadas pelo sistema Isenta.
     </div>
   </div>
 </body>

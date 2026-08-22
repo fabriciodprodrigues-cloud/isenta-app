@@ -37,6 +37,14 @@ export interface OrgaoDoOficio {
   responsibleName: string;
   responsibleEmail: string;
   responsiblePhone: string;
+  /**
+   * Caixa institucional do órgão — destino do Reply-To. As respostas da
+   * concessionária caem aqui (não no e-mail pessoal do responsável) porque é
+   * a única caixa com credencial de leitura (IMAP) cadastrada, o que permite
+   * a leitura automática (ver lib/processar-respostas.ts). Não-nulo:
+   * avaliarIdentidadeEnvio() já garante isso antes de qualquer envio.
+   */
+  emailIsencao: string;
   /** Cargo de quem assina — um ofício sem cargo não identifica a autoridade. */
   responsibleRole: string | null;
   cabecalhoTexto: string | null;

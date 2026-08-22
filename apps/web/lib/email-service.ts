@@ -277,7 +277,11 @@ export async function enviarOficioDeIsencao({
         // ser rejeitado pelo servidor ou marcado como falsificação.
         from: `"${razao}" <${remetente.user}>`,
         to: destino,
-        replyTo: dados.orgao.responsibleEmail,
+        // Vai pra caixa institucional (não pro e-mail pessoal do
+        // responsável) — é a única com credencial de leitura (IMAP)
+        // cadastrada, o que permite a leitura automática das respostas
+        // (ver lib/processar-respostas.ts).
+        replyTo: dados.orgao.emailIsencao,
         subject: assuntoDoOficio(dados.orgao.name),
         text: texto,
         html,

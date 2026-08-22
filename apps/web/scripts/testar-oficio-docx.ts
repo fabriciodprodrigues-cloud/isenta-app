@@ -29,6 +29,7 @@ const dadosDeExemplo: DadosDoOficio = {
     cep: '79560-000',
     responsibleName: 'José da Silva',
     responsibleEmail: 'isencao@camarachapadaodosul.ms.gov.br',
+    emailIsencao: 'isencao@camarachapadaodosul.ms.gov.br',
     responsiblePhone: '(67) 3562-1234',
     responsibleRole: 'Presidente da Câmara',
     cabecalhoTexto: null,

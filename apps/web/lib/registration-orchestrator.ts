@@ -336,6 +336,7 @@ export async function processRegistration(
       cep: orgao.cep,
       responsibleName: orgao.responsibleName,
       responsibleEmail: orgao.responsibleEmail,
+      emailIsencao: orgao.emailIsencao!,
       responsiblePhone: orgao.responsiblePhone,
       responsibleRole: orgao.responsibleRole,
       cabecalhoTexto: orgao.cabecalhoTexto,
