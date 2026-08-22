@@ -125,15 +125,19 @@ async function processar(registro, navegador) {
       senha,
     });
 
-    await motiva.criarSolicitacao(page, {
-      concessionariaRotulo: rotulo,
-      veiculo,
-      orgao,
-      // Decisão do produto: responde SIM quando o veículo tem TAG cadastrada
-      // no Isenta.
-      temTagNoSistema: veiculo.tags.length > 0,
-      arquivoCrlv,
-    });
+    await motiva.criarSolicitacao(
+      page,
+      {
+        concessionariaRotulo: rotulo,
+        veiculo,
+        orgao,
+        // Decisão do produto: responde SIM quando o veículo tem TAG cadastrada
+        // no Isenta.
+        temTagNoSistema: veiculo.tags.length > 0,
+        arquivoCrlv,
+      },
+      capturar
+    );
 
     await prisma.concesssionaireRegistration.update({
       where: { id: registro.id },
