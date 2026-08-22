@@ -116,8 +116,11 @@ export async function processarRespostasDoOrgao(
         uidInicial: conta.imapUltimoUidLido ?? undefined,
         limite: 20,
       }),
-      // Não deixa um órgão com IMAP lento travar o lote inteiro.
-      signal: AbortSignal.timeout(15_000),
+      // 15s não bastava para uma conexão IMAP real (mesma lição do envio
+      // por SMTP: a primeira conexão a um provedor institucional pode
+      // demorar bem mais que o esperado). Cabe folgado no maxDuration de
+      // 60s das rotas que chamam isto, mesmo com poucos órgãos configurados.
+      signal: AbortSignal.timeout(45_000),
     });
   } catch (erro) {
     throw new Error(

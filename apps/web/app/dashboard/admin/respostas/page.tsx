@@ -68,6 +68,13 @@ export default function RespostasRecebidas() {
         setAviso(
           `${corpo.orgaosVerificados} órgão(s) verificado(s), ${corpo.emailsNovos} e-mail(s) novo(s).`
         );
+        // "Sucesso" aqui só quer dizer que a rota respondeu — um órgão pode
+        // ter falhado na leitura (ex: timeout do IMAP) e isso não aparece
+        // no resumo acima, só nesta lista. Sem isto, uma falha silenciosa
+        // parecia "0 e-mails novos" e ninguém saberia que algo deu errado.
+        if (corpo.erros?.length) {
+          setErro(corpo.erros.join(' · '));
+        }
         await carregar();
       } else {
         setErro(corpo.error ?? 'Não foi possível verificar agora.');
