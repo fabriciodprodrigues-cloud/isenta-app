@@ -73,12 +73,13 @@ async function entrar(page, credencial) {
   // O login é Azure AD B2C, em outro domínio.
   await page.waitForURL(/b2clogin\.com/, { timeout: 30_000 });
 
-  // getByLabel(/e-?mail/i) sozinho casa com dois elementos: o campo e o
-  // <form> ao redor, cujo aria-label também contém "e-mail" ("Sign in with
-  // your e-mail") — confirmado numa execução real contra o portal.
-  // Interseção com getByRole('textbox') restringe ao campo de fato.
+  // getByLabel sozinho é ambíguo nos dois campos: o de e-mail casa também
+  // com o <form> ao redor ("Sign in with your e-mail"), e o de senha casa
+  // também com o botão "Mostrar senha" — confirmado numa execução real
+  // contra o portal. Interseção com getByRole('textbox') restringe ao
+  // campo de fato em ambos os casos.
   await page.getByLabel(/e-?mail/i).and(page.getByRole('textbox')).fill(credencial.usuario);
-  await page.getByLabel(/senha/i).fill(credencial.senha);
+  await page.getByLabel(/senha/i).and(page.getByRole('textbox')).fill(credencial.senha);
   await page.getByRole('button', { name: /^entrar$/i }).click();
 
   // Volta para o portal já autenticado. Aceita os dois domínios: confirmado
