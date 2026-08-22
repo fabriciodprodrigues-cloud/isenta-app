@@ -150,6 +150,23 @@ async function criarSolicitacao(page, dados, capturar) {
   // página trazia só os links de ajuda e os botões, sem o card). Espera o
   // card renderizar antes de mexer no input.
   await page.getByText(/documento do ve[íi]culo/i).waitFor({ timeout: 30_000 });
+
+  const totalInputsArquivo = await page.locator('input[type="file"]').count();
+  console.log('  inputs[type=file] após o card aparecer:', totalInputsArquivo);
+  if (totalInputsArquivo === 0) {
+    // O campo pode só existir depois de clicar no "+" (input escondido,
+    // aberto via clique em vez de já estar no DOM). Loga os botões da
+    // página pra achar o seletor certo em vez de adivinhar de novo.
+    const botoes = await page.locator('button').evaluateAll(els =>
+      els.map(el => ({
+        texto: el.textContent?.trim().slice(0, 60),
+        ariaLabel: el.getAttribute('aria-label'),
+        title: el.getAttribute('title'),
+      }))
+    );
+    console.log('  botões na página:', JSON.stringify(botoes));
+  }
+
   await page.setInputFiles('input[type="file"]', arquivoCrlv);
   // Espera a confirmação visual de "1 de 1" antes de seguir; sem isso o
   // Continuar pode ser clicado enquanto o upload ainda corre.
