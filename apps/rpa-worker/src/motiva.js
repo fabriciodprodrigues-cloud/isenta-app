@@ -86,8 +86,20 @@ async function entrar(page, credencial, capturar) {
   // que isentos.ccrpagamentos.com.br (contas antigas, como a da Câmara de
   // Chapadão do Sul) e isentos.motivapagamentos.com.br servem o mesmo site,
   // e o Azure B2C pode devolver pra qualquer um dos dois conforme a conta.
+  //
+  // Precisa ser função de predicado sobre o HOSTNAME, não regex solta contra
+  // a URL inteira: a própria URL de login carrega
+  // "...&redirect_uri=https://isentos.ccrpagamentos.com.br/confirm-login" na
+  // query string, e uma regex não ancorada casa com esse texto mesmo
+  // enquanto a página ainda está no formulário do Azure B2C -- o código
+  // seguia adiante achando que o login tinha terminado sem ter terminado.
+  // Confirmado numa execução real (log mostrou "pós-login" ainda em
+  // b2clogin.com).
   try {
-    await page.waitForURL(/isentos\.(ccr|motiva)pagamentos\.com\.br/, { timeout: 45_000 });
+    await page.waitForURL(
+      url => /^isentos\.(ccr|motiva)pagamentos\.com\.br$/.test(new URL(url).hostname),
+      { timeout: 45_000 }
+    );
   } catch {
     throw new ErroDeAutomacao(
       'Login não concluiu. Verifique usuário e senha do portal, ou se a conta pede verificação adicional.'
