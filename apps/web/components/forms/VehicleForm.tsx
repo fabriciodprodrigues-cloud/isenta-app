@@ -294,14 +294,16 @@ export function VehicleForm({
             </div>
           </div>
 
-          <div className="rounded-lg border border-white/8 bg-ink-700/50 p-4">
-            <p className="text-sm text-paper-dim">
-              <span className="font-medium text-paper">Próximas etapas:</span>
-              <br />
-              Após criar o veículo, você poderá fazer upload de documentos
-              (CRLV, contrato de locação) e enviar para as concessionárias.
-            </p>
-          </div>
+          {!vehicle && (
+            <div className="rounded-lg border border-white/8 bg-ink-700/50 p-4">
+              <p className="text-sm text-paper-dim">
+                <span className="font-medium text-paper">Próximas etapas:</span>
+                <br />
+                Após criar o veículo, você poderá fazer upload de documentos
+                (CRLV, contrato de locação) e enviar para as concessionárias.
+              </p>
+            </div>
+          )}
         </CardBody>
 
         <CardFooter>
