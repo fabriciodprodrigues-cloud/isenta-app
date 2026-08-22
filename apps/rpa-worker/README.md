@@ -18,7 +18,7 @@ envio, e captura de tela de cada etapa.
 
 **Não faz:** criar a conta no portal. O cadastro exige um código de seis
 dígitos enviado por e-mail, e acontece uma vez por órgão — automatizar não
-compensa. Crie manualmente em isentos.ccrpagamentos.com.br, opção
+compensa. Crie manualmente em isentos.motivapagamentos.com.br, opção
 "Para sua empresa", com o CNPJ do órgão.
 
 ## Variáveis necessárias

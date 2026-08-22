@@ -15,7 +15,9 @@ const { get } = require('@vercel/blob');
  * estáveis.
  */
 
-const URL_PORTAL = 'https://isentos.ccrpagamentos.com.br';
+// CCR renomeou pra Motiva e o domínio do portal mudou junto — o cadastro
+// real de "Motiva Paraná (ex-PRVias)" no banco já usa este domínio.
+const URL_PORTAL = 'https://isentos.motivapagamentos.com.br';
 
 /** Nome da concessionária no nosso banco → rótulo no seletor do portal. */
 const NOME_NO_PORTAL = {
@@ -73,7 +75,7 @@ async function entrar(page, credencial) {
 
   // Volta para o portal já autenticado.
   try {
-    await page.waitForURL(/isentos\.ccrpagamentos\.com\.br/, { timeout: 45_000 });
+    await page.waitForURL(/isentos\.motivapagamentos\.com\.br/, { timeout: 45_000 });
   } catch {
     throw new ErroDeAutomacao(
       'Login não concluiu. Verifique usuário e senha do portal, ou se a conta pede verificação adicional.'

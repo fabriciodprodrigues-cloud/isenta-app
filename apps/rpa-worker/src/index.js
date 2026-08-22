@@ -46,7 +46,9 @@ async function buscarPendentes() {
       rpaTentativas: { lt: MAX_TENTATIVAS },
       rpaAguardando: null,
       concessionaire: {
-        canalIsentos: { contains: 'isentos.ccrpagamentos.com.br' },
+        // CCR renomeou pra Motiva; o domínio do portal mudou junto (ver
+        // "Motiva Paraná (ex-PRVias)" no seed, motiva.js::URL_PORTAL).
+        canalIsentos: { contains: 'isentos.motivapagamentos.com.br' },
       },
       vehicle: {
         documents: { some: { type: 'crlv' } },
