@@ -73,9 +73,12 @@ async function entrar(page, credencial) {
   await page.getByLabel(/senha/i).fill(credencial.senha);
   await page.getByRole('button', { name: /^entrar$/i }).click();
 
-  // Volta para o portal já autenticado.
+  // Volta para o portal já autenticado. Aceita os dois domínios: confirmado
+  // que isentos.ccrpagamentos.com.br (contas antigas, como a da Câmara de
+  // Chapadão do Sul) e isentos.motivapagamentos.com.br servem o mesmo site,
+  // e o Azure B2C pode devolver pra qualquer um dos dois conforme a conta.
   try {
-    await page.waitForURL(/isentos\.motivapagamentos\.com\.br/, { timeout: 45_000 });
+    await page.waitForURL(/isentos\.(ccr|motiva)pagamentos\.com\.br/, { timeout: 45_000 });
   } catch {
     throw new ErroDeAutomacao(
       'Login não concluiu. Verifique usuário e senha do portal, ou se a conta pede verificação adicional.'
