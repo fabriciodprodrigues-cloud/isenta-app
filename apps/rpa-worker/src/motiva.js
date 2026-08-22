@@ -136,34 +136,29 @@ async function criarSolicitacao(page, dados, capturar) {
     await page.getByRole('button', { name: /^continuar$/i }).click();
   }
 
-  // isVisible({ timeout }) não espera de verdade -- é uma checagem imediata
-  // do estado atual do DOM, o parâmetro timeout não faz polling. Depois do
-  // clique em "Nova solicitação" (que mostra um spinner antes de assentar),
-  // uma checagem imediata quase sempre pegava a página no meio do
-  // carregamento e concluía errado que ainda estava no passo 1 -- mesmo
-  // aumentando pra 10s, confirmado numa execução real (screenshot do "erro"
-  // mostrava o passo 3 funcionando normalmente, sem problema nenhum). Espera
-  // de verdade por um dos dois indicadores (combobox do passo 1, ou card do
-  // passo 3), o que aparecer primeiro decide o caminho.
-  const indicador = await Promise.race([
-    page
-      .getByText('Documento do Veículo', { exact: true })
-      .waitFor({ timeout: 15_000 })
-      .then(() => 'documento'),
-    page
-      .getByRole('combobox')
-      .first()
-      .waitFor({ timeout: 15_000 })
-      .then(() => 'combobox'),
-  ]).catch(() => null);
+  // O rascunho pode retomar em qualquer um dos 4 passos, não só "passo 1
+  // limpo" ou "passo 3 documento". Uma checagem baseada em "achou algum
+  // combobox" quebrava quando o resumo caía no Passo 4 (que também tem um
+  // combobox -- o seletor de UF), fazendo o código tentar o Passo 1 à toa
+  // numa página que já estava no Passo 4. Confirmado numa execução real
+  // (screenshot do "erro" mostrava o dropdown de UF aberto, não a lista de
+  // concessionárias). Lê o número direto do cabeçalho "Passo X de 4" e só
+  // executa os passos que realmente faltam.
+  const cabecalhoPasso = page.getByText(/passo \d de 4/i);
+  await cabecalhoPasso.waitFor({ timeout: 15_000 }).catch(() => {});
+  const textoPasso = await cabecalhoPasso.textContent().catch(() => null);
+  const passo = Number(textoPasso?.match(/passo (\d) de 4/i)?.[1]) || 1;
+  console.log('  passo atual do rascunho:', passo, textoPasso ? `(${textoPasso.trim()})` : '(não identificado)');
 
-  if (indicador === 'combobox') {
+  if (passo <= 1) {
     // ---- Passo 1: concessionária ----
     await page.getByRole('combobox').first().click();
     await page.getByText(concessionariaRotulo, { exact: true }).click();
     await capturar('02-concessionaria');
     await page.getByRole('button', { name: /continuar/i }).click();
+  }
 
+  if (passo <= 2) {
     // ---- Passo 2: tipo de isenção ----
     // O portal separa em Veículo Oficial e Veículo Locado, que é exatamente
     // a distinção que já guardamos em Vehicle.type.
@@ -176,36 +171,34 @@ async function criarSolicitacao(page, dados, capturar) {
     await capturar('03b-apos-continuar');
   }
 
-  // ---- Passo 3: documento ----
-  // O card "Documento do Veículo" (com o campo de upload) só aparece depois
-  // de uma chamada assíncrona que roda após a navegação — tentar o upload
-  // direto encontrava 0 inputs, confirmado numa execução real (o texto da
-  // página trazia só os links de ajuda e os botões, sem o card). Espera o
-  // card renderizar antes de mexer no input.
-  await page.getByText('Documento do Veículo', { exact: true }).waitFor({ timeout: 60_000 });
+  if (passo <= 3) {
+    // ---- Passo 3: documento ----
+    // O card "Documento do Veículo" (com o campo de upload) só aparece
+    // depois de uma chamada assíncrona que roda após a navegação -- tentar
+    // o upload direto encontrava 0 inputs, confirmado numa execução real.
+    // Espera o card renderizar antes de mexer no input.
+    await page.getByText('Documento do Veículo', { exact: true }).waitFor({ timeout: 60_000 });
 
-  const totalInputsArquivo = await page.locator('input[type="file"]').count();
-  console.log('  inputs[type=file] após o card aparecer:', totalInputsArquivo);
-  if (totalInputsArquivo === 0) {
-    // O campo pode só existir depois de clicar no "+" (input escondido,
-    // aberto via clique em vez de já estar no DOM). Loga os botões da
-    // página pra achar o seletor certo em vez de adivinhar de novo.
-    const botoes = await page.locator('button').evaluateAll(els =>
-      els.map(el => ({
-        texto: el.textContent?.trim().slice(0, 60),
-        ariaLabel: el.getAttribute('aria-label'),
-        title: el.getAttribute('title'),
-      }))
-    );
-    console.log('  botões na página:', JSON.stringify(botoes));
+    const totalInputsArquivo = await page.locator('input[type="file"]').count();
+    console.log('  inputs[type=file] após o card aparecer:', totalInputsArquivo);
+    if (totalInputsArquivo === 0) {
+      const botoes = await page.locator('button').evaluateAll(els =>
+        els.map(el => ({
+          texto: el.textContent?.trim().slice(0, 60),
+          ariaLabel: el.getAttribute('aria-label'),
+          title: el.getAttribute('title'),
+        }))
+      );
+      console.log('  botões na página:', JSON.stringify(botoes));
+    }
+
+    await page.setInputFiles('input[type="file"]', arquivoCrlv);
+    // Espera a confirmação visual de "1 de 1" antes de seguir; sem isso o
+    // Continuar pode ser clicado enquanto o upload ainda corre.
+    await page.getByText(/\(1 de 1\)/).waitFor({ timeout: 60_000 });
+    await capturar('04-documento');
+    await page.getByRole('button', { name: /continuar/i }).click();
   }
-
-  await page.setInputFiles('input[type="file"]', arquivoCrlv);
-  // Espera a confirmação visual de "1 de 1" antes de seguir; sem isso o
-  // Continuar pode ser clicado enquanto o upload ainda corre.
-  await page.getByText(/\(1 de 1\)/).waitFor({ timeout: 60_000 });
-  await capturar('04-documento');
-  await page.getByRole('button', { name: /continuar/i }).click();
 
   // ---- Passo 4: dados ----
   // Dados pessoais já vêm da conta e ficam bloqueados; preenchemos o endereço
