@@ -27,6 +27,11 @@ const INTERVALO_MS = Number(process.env.RPA_INTERVALO_MS ?? 5 * 60_000);
 const MAX_TENTATIVAS = Number(process.env.RPA_MAX_TENTATIVAS ?? 3);
 const LOTE = Number(process.env.RPA_LOTE ?? 10);
 const MODO_VISIVEL = process.env.RPA_VISIVEL === 'true';
+// Só pra rodar local em Windows sem o Chromium que o Playwright baixa
+// (encontrado um problema de resolução de manifesto SxS específico da
+// máquina) — usa o Edge do sistema em vez disso. Produção (Linux, Railway)
+// não define isto e continua usando o Chromium normal do Playwright.
+const CANAL_NAVEGADOR = process.env.RPA_BROWSER_CHANNEL || undefined;
 
 function log(...args) {
   console.log(new Date().toISOString(), ...args);
@@ -187,6 +192,7 @@ async function rodada() {
 
   const navegador = await chromium.launch({
     headless: !MODO_VISIVEL,
+    channel: CANAL_NAVEGADOR,
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   });
 
