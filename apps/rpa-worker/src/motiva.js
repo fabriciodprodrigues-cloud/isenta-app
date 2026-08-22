@@ -131,16 +131,19 @@ async function criarSolicitacao(page, dados, capturar) {
   // Uma tentativa anterior interrompida no meio do preenchimento deixa um
   // rascunho salvo no portal: a próxima visita a /solicitacao mostra um
   // modal perguntando se quer continuar de onde parou ou reiniciar, em vez
-  // de ir direto pro formulário. Confirmado ao vivo (com captura de tela)
-  // que clicar em "Continuar" pula direto pro passo em que o rascunho
-  // parou, com os campos anteriores preservados.
+  // de ir direto pro formulário. "Continuar" chegou a funcionar uma vez,
+  // mas depois de várias tentativas seguidas passou a quebrar com
+  // EXISTING_DRAFT_ERROR ao tentar carregar o passo de documento --
+  // provavelmente rascunhos conflitantes acumulados pelos próprios testes.
+  // "Reiniciar" descarta o rascunho travado (não afeta nada já enviado) e
+  // sempre deixa a página num estado limpo e previsível.
   const modalRascunho = page.getByText(/seja bem.?vindo/i);
   if (await modalRascunho.isVisible({ timeout: 5_000 }).catch(() => false)) {
-    await page.getByRole('button', { name: /^continuar$/i }).click();
+    await page.getByRole('button', { name: /^reiniciar$/i }).click();
   }
 
   const passoDocumentoJaVisivel = await page
-    .getByText(/documento do ve[íi]culo/i)
+    .getByText('Documento do Veículo', { exact: true })
     .isVisible({ timeout: 3_000 })
     .catch(() => false);
 
