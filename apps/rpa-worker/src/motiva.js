@@ -210,6 +210,17 @@ async function criarSolicitacao(page, dados, capturar) {
   // ---- Passo 4: dados ----
   // Dados pessoais já vêm da conta e ficam bloqueados; preenchemos o endereço
   // e o veículo.
+  const camposDiagnostico = await page.locator('input').evaluateAll(els =>
+    els.map(el => ({
+      name: el.getAttribute('name'),
+      id: el.id || null,
+      placeholder: el.getAttribute('placeholder'),
+      ariaLabel: el.getAttribute('aria-label'),
+      type: el.getAttribute('type'),
+    }))
+  );
+  console.log('  campos do passo 4:', JSON.stringify(camposDiagnostico));
+
   await page.getByLabel(/^cep/i).fill(soDigitos(orgao.cep));
   await page.getByLabel(/^endereço/i).fill(orgao.address ?? '');
   await page.getByLabel(/^número/i).fill(orgao.numero ?? 'S/N');
