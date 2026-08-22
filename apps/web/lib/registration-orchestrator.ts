@@ -1,7 +1,12 @@
 import { get } from '@vercel/blob';
 import { prisma } from './prisma';
-import { enviarOficioDeIsencao, type AnexoDocumento } from './email-service';
-import type { VeiculoDoOficio } from './oficio-isencao';
+import {
+  enviarOficioDeIsencao,
+  converterDocxParaPdf,
+  type AnexoDocumento,
+} from './email-service';
+import type { VeiculoDoOficio, DadosDoOficio } from './oficio-isencao';
+import { montarOficioDocx } from './oficio-docx';
 import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
 import { abrir, type CredencialSmtp } from './cofre';
 
@@ -67,6 +72,26 @@ async function carregarTimbre(pathname: string): Promise<string | null> {
     return `data:${tipo};base64,${buffer.toString('base64')}`;
   } catch (erro) {
     console.error('Falha ao carregar o papel timbrado:', erro);
+    return null;
+  }
+}
+
+/**
+ * Carrega o modelo de ofício (.docx) do órgão, como buffer bruto — sem
+ * conversão nenhuma, quem usa (montarOficioDocx) é quem sabe manipular XML.
+ */
+async function carregarModeloOficio(pathname: string): Promise<Buffer | null> {
+  try {
+    const resultado = await get(pathname, { access: 'private' });
+
+    if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+      console.error(`Modelo de ofício indisponível no Blob: ${pathname}`);
+      return null;
+    }
+
+    return Buffer.from(await new Response(resultado.stream).arrayBuffer());
+  } catch (erro) {
+    console.error('Falha ao carregar o modelo de ofício:', erro);
     return null;
   }
 }
@@ -290,35 +315,64 @@ export async function processRegistration(
     };
   }
 
+  const dadosDoOficio: DadosDoOficio = {
+    numeroOficio,
+    protocolo,
+    concessionariaNome: concessionaria.name,
+    veiculos,
+    anexos: nomesAnexos,
+    timbreDataUri,
+    orgao: {
+      name: orgao.name,
+      razaoSocial: orgao.razaoSocial,
+      cnpj: orgao.cnpj,
+      address: orgao.address,
+      bairro: orgao.bairro,
+      numero: orgao.numero,
+      city: orgao.city,
+      state: orgao.state,
+      cep: orgao.cep,
+      responsibleName: orgao.responsibleName,
+      responsibleEmail: orgao.responsibleEmail,
+      responsiblePhone: orgao.responsiblePhone,
+      responsibleRole: orgao.responsibleRole,
+      cabecalhoTexto: orgao.cabecalhoTexto,
+      cidadeEmissao: orgao.cidadeEmissao,
+    },
+  };
+
+  // Órgão com modelo próprio: gera o PDF do ofício (corpo programático
+  // enxertado no cabeçalho/timbre do modelo) e anexa, em vez de mandar o
+  // texto completo no corpo do e-mail. Modelo quebrado ou conversão
+  // indisponível caem de volta pro HTML de sempre — nunca bloqueiam o envio
+  // por causa disso.
+  let anexoOficioPdf: AnexoDocumento | null = null;
+
+  if (orgao.modeloOficioUrl) {
+    const modelo = await carregarModeloOficio(orgao.modeloOficioUrl);
+    if (modelo) {
+      try {
+        const docx = await montarOficioDocx(dadosDoOficio, modelo);
+        const pdf = await converterDocxParaPdf(docx);
+        const nomeArquivo = `Oficio ${numeroOficio.replace('/', '-')} - ${orgao.name}.pdf`;
+        anexoOficioPdf = { fileName: nomeArquivo, content: pdf };
+        // Entra na lista só agora — o corpo do PDF (montado acima) não deve
+        // se listar como o próprio anexo.
+        nomesAnexos.unshift(nomeArquivo);
+      } catch (erro) {
+        console.error(`Falha ao gerar PDF do ofício para ${orgao.name}:`, erro);
+      }
+    }
+  }
+
+  if (anexoOficioPdf) anexos.unshift(anexoOficioPdf);
+
   const { anexosEnviados } = await enviarOficioDeIsencao({
     destino: concessionaria.canalIsentos,
     remetente,
     anexos,
-    dados: {
-      numeroOficio,
-      protocolo,
-      concessionariaNome: concessionaria.name,
-      veiculos,
-      anexos: nomesAnexos,
-      timbreDataUri,
-      orgao: {
-        name: orgao.name,
-        razaoSocial: orgao.razaoSocial,
-        cnpj: orgao.cnpj,
-        address: orgao.address,
-        bairro: orgao.bairro,
-        numero: orgao.numero,
-        city: orgao.city,
-        state: orgao.state,
-        cep: orgao.cep,
-        responsibleName: orgao.responsibleName,
-        responsibleEmail: orgao.responsibleEmail,
-        responsiblePhone: orgao.responsiblePhone,
-        responsibleRole: orgao.responsibleRole,
-        cabecalhoTexto: orgao.cabecalhoTexto,
-        cidadeEmissao: orgao.cidadeEmissao,
-      },
-    },
+    usarMensagemCurta: Boolean(anexoOficioPdf),
+    dados: dadosDoOficio,
   });
 
   // Só depois do envio confirmado, e para o grupo inteiro — o ofício cobre

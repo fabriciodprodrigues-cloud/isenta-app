@@ -43,6 +43,7 @@ interface Orgao {
   metodoAcessoEmail: string | null;
   emailVerificado: boolean;
   timbreUrl: string | null;
+  modeloOficioUrl: string | null;
   cabecalhoTexto: string | null;
   cidadeEmissao: string | null;
   metodoAssinatura: string | null;
@@ -77,6 +78,7 @@ export default function OnboardingOrgao() {
   const [aviso, setAviso] = useState('');
 
   const inputTimbre = useRef<HTMLInputElement>(null);
+  const inputModeloOficio = useRef<HTMLInputElement>(null);
 
   async function carregar() {
     try {
@@ -181,6 +183,35 @@ export default function OnboardingOrgao() {
     } finally {
       setSalvando(false);
       if (inputTimbre.current) inputTimbre.current.value = '';
+    }
+  }
+
+  async function enviarModeloOficio(arquivo: File) {
+    setErro('');
+    setAviso('');
+    setSalvando(true);
+
+    const dados = new FormData();
+    dados.append('file', arquivo);
+
+    try {
+      const resposta = await fetch(
+        `/api/accounts/${accountId}/identidade/modelo-oficio`,
+        { method: 'POST', body: dados }
+      );
+      const corpo = await resposta.json().catch(() => null);
+
+      if (resposta.ok) {
+        setAviso('Modelo de ofício enviado.');
+        await carregar();
+      } else {
+        setErro(corpo?.error ?? 'Não foi possível enviar o modelo.');
+      }
+    } catch {
+      setErro('Falha de conexão.');
+    } finally {
+      setSalvando(false);
+      if (inputModeloOficio.current) inputModeloOficio.current.value = '';
     }
   }
 
@@ -325,6 +356,8 @@ export default function OnboardingOrgao() {
               inputRef={inputTimbre}
               onArquivo={enviarTimbre}
               onSalvar={salvar}
+              inputRefModeloOficio={inputModeloOficio}
+              onArquivoModeloOficio={enviarModeloOficio}
             />
           )}
           {passo === 5 && (
@@ -857,6 +890,8 @@ function PassoTimbre({
   inputRef,
   onArquivo,
   onSalvar,
+  inputRefModeloOficio,
+  onArquivoModeloOficio,
 }: {
   orgao: Orgao;
   accountId: string;
@@ -864,6 +899,8 @@ function PassoTimbre({
   inputRef: React.RefObject<HTMLInputElement>;
   onArquivo: (arquivo: File) => void;
   onSalvar: (campos: Record<string, unknown>) => Promise<boolean>;
+  inputRefModeloOficio: React.RefObject<HTMLInputElement>;
+  onArquivoModeloOficio: (arquivo: File) => void;
 }) {
   const [cabecalho, setCabecalho] = useState(orgao.cabecalhoTexto ?? '');
   const [cidade, setCidade] = useState(orgao.cidadeEmissao ?? orgao.city ?? '');
@@ -871,7 +908,7 @@ function PassoTimbre({
   return (
     <div className="space-y-5">
       <p className="text-sm text-paper-dim">
-        O timbre aparece no topo do ofício. Envie em PNG, JPG, PDF ou Word, até 4 MB.
+        O timbre aparece no topo do ofício. Envie em PNG ou JPG, até 4 MB.
       </p>
 
       {orgao.timbreUrl && (
@@ -889,12 +926,45 @@ function PassoTimbre({
           <input
             ref={inputRef}
             type="file"
-            accept="image/png,image/jpeg,application/pdf,.docx"
+            accept="image/png,image/jpeg"
             className="hidden"
             disabled={salvando}
             onChange={e => {
               const arquivo = e.target.files?.[0];
               if (arquivo) onArquivo(arquivo);
+            }}
+          />
+        </label>
+      </div>
+
+      <div className="rounded border border-white/10 bg-ink-700/40 p-4 space-y-3">
+        <p className="text-sm text-paper-dim">
+          Modelo de ofício em Word (opcional). Se o órgão já tem um modelo próprio
+          (cabeçalho/timbre, corpo em branco), envie-o aqui — o ofício sai como PDF
+          gerado a partir dele, anexado ao e-mail, em vez do texto padrão no corpo.
+        </p>
+
+        {orgao.modeloOficioUrl && (
+          <a
+            href={`/api/accounts/${accountId}/identidade/modelo-oficio`}
+            target="_blank"
+            className="block text-sm text-green hover:underline"
+          >
+            Baixar modelo atual
+          </a>
+        )}
+
+        <label className="inline-block cursor-pointer rounded border border-white/20 px-4 py-2 text-sm font-medium text-paper hover:bg-white/5">
+          {orgao.modeloOficioUrl ? 'Substituir modelo' : 'Enviar modelo (.docx)'}
+          <input
+            ref={inputRefModeloOficio}
+            type="file"
+            accept=".docx"
+            className="hidden"
+            disabled={salvando}
+            onChange={e => {
+              const arquivo = e.target.files?.[0];
+              if (arquivo) onArquivoModeloOficio(arquivo);
             }}
           />
         </label>

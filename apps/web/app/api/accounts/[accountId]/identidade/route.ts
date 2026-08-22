@@ -62,6 +62,7 @@ export async function GET(
       // Só a presença importa aqui; o conteúdo cifrado nunca sai desta rota.
       emailCredencialCifrada: true,
       timbreUrl: true,
+      modeloOficioUrl: true,
       cabecalhoTexto: true,
       cidadeEmissao: true,
       metodoAssinatura: true,

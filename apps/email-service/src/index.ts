@@ -3,6 +3,11 @@ import type { NextFunction, Request, Response } from 'express';
 import { createTransport } from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import dotenv from 'dotenv';
+import { execFile } from 'child_process';
+import { promises as fs } from 'fs';
+import os from 'os';
+import path from 'path';
+import { randomUUID } from 'crypto';
 
 dotenv.config();
 
@@ -137,6 +142,88 @@ app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, 
       erro: 'Falha ao enviar e-mail',
       detalhe: erro instanceof Error ? erro.message : String(erro),
     });
+  }
+});
+
+interface CorpoConversao {
+  /** .docx do ofício já com o corpo preenchido, em base64. */
+  docxBase64?: string;
+}
+
+/** execFile com timeout — soffice trava em vez de sair se o filtro falhar. */
+function execFileComTimeout(
+  comando: string,
+  args: string[],
+  timeoutMs: number
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const processo = execFile(comando, args, { timeout: timeoutMs }, erro => {
+      if (erro) reject(erro);
+      else resolve();
+    });
+    processo.on('error', reject);
+  });
+}
+
+/**
+ * Converte o .docx do ofício (corpo gerado + cabeçalho do órgão) em PDF.
+ *
+ * Endpoint separado de /send-email de propósito: mantém o envio de e-mail
+ * sem saber nada sobre LibreOffice, permite testar a conversão isolada, e dá
+ * uma classe de erro própria (falha de conversão é diferente de falha de
+ * SMTP).
+ *
+ * Cada chamada usa um perfil de usuário do LibreOffice isolado
+ * (-env:UserInstallation): duas instâncias headless disputando o mesmo
+ * perfil em requisições concorrentes travam com "Fatal Error" — dois órgãos
+ * enviando ao mesmo tempo bastam para isso acontecer.
+ */
+app.post('/convert-docx-to-pdf', exigirSegredo, async (req: Request<{}, {}, CorpoConversao>, res: Response) => {
+  const { docxBase64 } = req.body ?? {};
+
+  if (!docxBase64) {
+    res.status(400).json({ erro: 'Campo obrigatório: docxBase64.' });
+    return;
+  }
+
+  const dir = path.join(os.tmpdir(), 'isenta-oficio', randomUUID());
+  const perfil = path.join(os.tmpdir(), 'isenta-lo-profile', randomUUID());
+
+  try {
+    await fs.mkdir(dir, { recursive: true });
+
+    const entrada = path.join(dir, 'oficio.docx');
+    await fs.writeFile(entrada, Buffer.from(docxBase64, 'base64'));
+
+    await execFileComTimeout(
+      'soffice',
+      [
+        '--headless',
+        '--norestore',
+        `-env:UserInstallation=file://${perfil}`,
+        '--convert-to',
+        'pdf',
+        '--outdir',
+        dir,
+        entrada,
+      ],
+      20_000
+    );
+
+    const pdf = await fs.readFile(path.join(dir, 'oficio.pdf'));
+
+    res.status(200).json({ pdfBase64: pdf.toString('base64') });
+  } catch (erro) {
+    // Falha do LibreOffice (filtro, timeout) não é bug nosso — mesma lógica
+    // de 502 usada em /send-email para erro de SMTP remoto.
+    console.error('Erro ao converter docx para PDF:', erro);
+    res.status(502).json({
+      erro: 'Falha ao converter documento',
+      detalhe: erro instanceof Error ? erro.message : String(erro),
+    });
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(perfil, { recursive: true, force: true }).catch(() => {});
   }
 });
 

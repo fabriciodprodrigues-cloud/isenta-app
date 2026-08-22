@@ -65,6 +65,11 @@ model Account {
   timbreUrl          String?  // pathname do arquivo no Blob privado
   cabecalhoTexto     String?  // ex: nome da secretaria
   cidadeEmissao      String?  // usada no fecho do ofício
+  // Modelo de ofício em .docx enviado pelo órgão (cabeçalho com o timbre
+  // real, corpo em branco). Opcional: sem ele o envio cai no HTML de
+  // montarOficio() como hoje. Pathname no Blob privado, mesmo padrão de
+  // timbreUrl.
+  modeloOficioUrl    String?
 
   // --- Assinatura ---
   metodoAssinatura   String?  // GOVBR_ICP | ELETRONICA_INTERNA

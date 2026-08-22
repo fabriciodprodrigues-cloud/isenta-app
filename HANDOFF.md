@@ -139,8 +139,9 @@ nginx (srv1920691.hstgr.cloud, TLS via Let's Encrypt)  — porta 443, pública
    v
 Node/Express (127.0.0.1:3000 — só loopback, nunca exposto direto)
    |
-   +--> POST /send-email     -> nodemailer -> SMTP do órgão
-   +--> POST /check-emails   -> imapflow   -> IMAP do órgão
+   +--> POST /send-email             -> nodemailer -> SMTP do órgão
+   +--> POST /convert-docx-to-pdf    -> soffice (LibreOffice headless)
+   +--> POST /check-emails           -> imapflow   -> IMAP do órgão
    +--> GET  /health
 ```
 
@@ -168,6 +169,32 @@ O código-fonte vive em `apps/email-service/` no repositório (fonte de
 verdade); o `.gitignore` da raiz já cobre `node_modules/` e `dist/`, então só
 `src/`, `package.json` e `tsconfig.json` são versionados. O `.env` do VPS
 **não** é versionado — vive só no servidor.
+
+**LibreOffice headless (`/convert-docx-to-pdf`).** Órgão com modelo de ofício
+próprio (`Account.modeloOficioUrl`) tem o ofício gerado como PDF — corpo
+programático enxertado no `.docx` do órgão (ver `lib/oficio-docx.ts`),
+convertido para PDF por este endpoint e anexado ao e-mail. **Requer
+`libreoffice-writer` instalado no VPS** — não fazia parte da imagem original
+(ver "Servidor 'novo' pode não ser novo" abaixo) e **ainda não foi
+confirmado/instalado neste servidor**. Provisionar com:
+
+```bash
+apt-get update && apt-get install -y libreoffice-writer
+```
+
+Depois de instalar, testar direto (sem depender do relay) com um `.docx`
+qualquer:
+
+```bash
+soffice --headless --norestore -env:UserInstallation=file:///tmp/lo-teste --convert-to pdf --outdir /tmp algum-arquivo.docx
+```
+
+Se faltar algum filtro de conversão, o metapacote completo (`apt-get install
+-y libreoffice`) resolve, ao custo de instalar Calc/Impress/Base junto.
+Sem LibreOffice instalado, o endpoint responde 502 — o envio não quebra: o
+orquestrador cai de volta para o ofício em HTML de sempre quando a conversão
+falha (`registration-orchestrator.ts`, bloco `try/catch` em volta de
+`montarOficioDocx`/`converterDocxParaPdf`).
 
 **Testar do próprio VPS**, sem nunca expor a senha na tela (usa os nomes das
 variáveis do `.env`, não os valores):

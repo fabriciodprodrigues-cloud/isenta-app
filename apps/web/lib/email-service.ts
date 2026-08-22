@@ -2,16 +2,23 @@ import nodemailer from 'nodemailer';
 import { get } from '@vercel/blob';
 import {
   montarOficio,
+  montarMensagemCurta,
   assuntoDoOficio,
   type DadosDoOficio,
 } from './oficio-isencao';
 import type { CredencialSmtp } from './cofre';
 
-export interface AnexoDocumento {
-  fileName: string;
-  /** Pathname do blob na store privada, nao uma url publica. */
-  url: string;
-}
+export type AnexoDocumento =
+  | {
+      fileName: string;
+      /** Pathname do blob na store privada, nao uma url publica. */
+      url: string;
+    }
+  | {
+      fileName: string;
+      /** Conteúdo já pronto em memória (ex: o PDF do ofício, recém-gerado). */
+      content: Buffer;
+    };
 
 interface SendExemptionRequestEmailProps {
   registrationId: string;
@@ -40,6 +47,12 @@ async function baixarAnexos(anexos: AnexoDocumento[]) {
   const baixados = [];
 
   for (const anexo of anexos) {
+    // Já vem pronto em memória (ex: o PDF do ofício) — nada a baixar.
+    if ('content' in anexo) {
+      baixados.push({ filename: anexo.fileName, content: anexo.content });
+      continue;
+    }
+
     try {
       // A store e privada: um fetch direto na url retorna 401. So o SDK
       // autentica a leitura.
@@ -147,6 +160,56 @@ export class RelayDeEmailFalhouError extends Error {
   }
 }
 
+export class ConversaoDocxFalhouError extends Error {
+  constructor(detalhe: string) {
+    super(`Falha ao converter o ofício em PDF: ${detalhe}`);
+    this.name = 'ConversaoDocxFalhouError';
+  }
+}
+
+/**
+ * Converte o .docx do ofício (corpo gerado + cabeçalho do órgão) em PDF,
+ * usando o LibreOffice headless que roda no mesmo VPS do relay de e-mail.
+ *
+ * Quem chama decide o que fazer se isto falhar (registration-orchestrator
+ * cai de volta para o HTML completo em vez de bloquear o envio) — por isso
+ * este erro nunca é tratado como fatal aqui, só propagado.
+ */
+export async function converterDocxParaPdf(docxBuffer: Buffer): Promise<Buffer> {
+  const relayUrl = process.env.EMAIL_RELAY_URL;
+  const relaySecret = process.env.EMAIL_RELAY_SECRET;
+  if (!relayUrl || !relaySecret) {
+    throw new RelayDeEmailNaoConfiguradoError();
+  }
+
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${relayUrl}/convert-docx-to-pdf`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': relaySecret,
+      },
+      body: JSON.stringify({ docxBase64: docxBuffer.toString('base64') }),
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch (erro) {
+    throw new ConversaoDocxFalhouError(
+      erro instanceof Error ? erro.message : String(erro)
+    );
+  }
+
+  if (!resposta.ok) {
+    const corpo = await resposta.json().catch(() => null);
+    throw new ConversaoDocxFalhouError(
+      corpo?.detalhe || corpo?.erro || `HTTP ${resposta.status}`
+    );
+  }
+
+  const { pdfBase64 } = await resposta.json();
+  return Buffer.from(pdfBase64, 'base64');
+}
+
 /**
  * Envia o ofício de pedido de isenção para uma concessionária.
  *
@@ -169,11 +232,18 @@ export async function enviarOficioDeIsencao({
   dados,
   anexos,
   remetente,
+  usarMensagemCurta = false,
 }: {
   destino: string;
   dados: DadosDoOficio;
   anexos: AnexoDocumento[];
   remetente: CredencialSmtp | null;
+  /**
+   * true quando o ofício completo já vai anexado em PDF (modelo próprio do
+   * órgão) — o corpo do e-mail vira só uma mensagem de capa em vez do HTML
+   * completo, que seria redundante com o PDF.
+   */
+  usarMensagemCurta?: boolean;
 }) {
   if (!remetente) {
     throw new RemetenteDoOrgaoAusenteError(dados.orgao.name);
@@ -185,7 +255,7 @@ export async function enviarOficioDeIsencao({
     throw new RelayDeEmailNaoConfiguradoError();
   }
 
-  const { texto, html } = montarOficio(dados);
+  const { texto, html } = usarMensagemCurta ? montarMensagemCurta(dados) : montarOficio(dados);
   const attachments = await baixarAnexos(anexos);
   const razao = dados.orgao.razaoSocial || dados.orgao.name;
 
@@ -218,7 +288,10 @@ export async function enviarOficioDeIsencao({
       }),
       // O relay já tem seu próprio timeout de SMTP; este é só para não
       // deixar a função da Vercel pendurada se o VPS ficar inacessível.
-      signal: AbortSignal.timeout(45_000),
+      // Reduzido de 45s para 30s: quando há modelo de ofício, essa chamada
+      // roda depois de converterDocxParaPdf (até 20s) na mesma requisição de
+      // até 60s de /api/registrations/send — precisa sobrar margem.
+      signal: AbortSignal.timeout(30_000),
     });
   } catch (erro) {
     throw new RelayDeEmailFalhouError(

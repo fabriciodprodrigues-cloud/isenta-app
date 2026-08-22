@@ -1,7 +1,19 @@
 import { format_date } from './utils';
+import {
+  PRAZO_PROPRIO_MESES,
+  PRAZO_LOCADO_MESES,
+  ROTULO_CATEGORIA,
+  porExtenso,
+  enderecoCompleto,
+  nomeVeiculo,
+  anos,
+  type VeiculoDoOficio,
+  type OrgaoDoOficio,
+  type DadosDoOficio,
+} from './oficio-dados';
 
 /**
- * Monta o ofício de pedido de isenção.
+ * Monta o ofício de pedido de isenção em HTML, para o corpo do e-mail.
  *
  * Um ofício por concessionária, cobrindo a frota inteira do órgão — e não um
  * e-mail por veículo. Um órgão com vinte carros dispararia vinte mensagens
@@ -9,64 +21,17 @@ import { format_date } from './utils';
  *
  * Frota própria e frota locada aparecem em seções distintas porque os prazos
  * pedidos são diferentes: 12 meses contra 4.
+ *
+ * Dados e helpers compartilhados com o template WordML (usado para o PDF
+ * anexado quando o órgão tem modelo próprio) vivem em oficio-dados.ts.
  */
 
-export const PRAZO_PROPRIO_MESES = 12;
-export const PRAZO_LOCADO_MESES = 4;
-
-export interface VeiculoDoOficio {
-  plate: string;
-  renavam: string;
-  type: string;
-  category: string;
-  marca: string | null;
-  modelo: string | null;
-  cor: string | null;
-  anoFabricacao: number | null;
-  anoModelo: number | null;
-}
-
-export interface OrgaoDoOficio {
-  name: string;
-  razaoSocial: string | null;
-  cnpj: string;
-  address: string;
-  bairro: string | null;
-  numero: string | null;
-  city: string;
-  state: string;
-  cep: string | null;
-  responsibleName: string;
-  responsibleEmail: string;
-  responsiblePhone: string;
-  /** Cargo de quem assina — um ofício sem cargo não identifica a autoridade. */
-  responsibleRole: string | null;
-  cabecalhoTexto: string | null;
-  cidadeEmissao: string | null;
-}
-
-export interface DadosDoOficio {
-  /** Número do ofício no formato NNN/AAAA, sequencial por órgão. */
-  numeroOficio: string;
-  protocolo: string;
-  orgao: OrgaoDoOficio;
-  concessionariaNome: string;
-  veiculos: VeiculoDoOficio[];
-  anexos: string[];
-  /**
-   * Papel timbrado do órgão, já em data URI.
-   *
-   * Vai embutido porque cliente de e-mail bloqueia imagem remota por padrão —
-   * um timbre por URL apareceria como espaço vazio na maioria das caixas.
-   */
-  timbreDataUri?: string | null;
-}
-
-const ROTULO_CATEGORIA: Record<string, string> = {
-  oficial: 'Oficial',
-  ambulancia: 'Ambulância',
-  bombeiro: 'Bombeiro',
-  outro: 'Outro',
+export {
+  PRAZO_PROPRIO_MESES,
+  PRAZO_LOCADO_MESES,
+  type VeiculoDoOficio,
+  type OrgaoDoOficio,
+  type DadosDoOficio,
 };
 
 /** Escapa o que vai para dentro do HTML — os dados vêm do cadastro do usuário. */
@@ -77,26 +42,6 @@ function esc(valor: string | number | null | undefined): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
-}
-
-function porExtenso(meses: number) {
-  const extenso: Record<number, string> = { 4: 'quatro', 12: 'doze' };
-  return `${meses} (${extenso[meses] ?? meses}) meses`;
-}
-
-function enderecoCompleto(o: OrgaoDoOficio) {
-  const linha = [o.address, o.numero, o.bairro].filter(Boolean).join(', ');
-  const cidade = `${o.city}/${o.state}`;
-  return [linha, cidade, o.cep].filter(Boolean).join(' — ');
-}
-
-function nomeVeiculo(v: VeiculoDoOficio) {
-  return [v.marca, v.modelo].filter(Boolean).join(' ') || '—';
-}
-
-function anos(v: VeiculoDoOficio) {
-  if (!v.anoFabricacao && !v.anoModelo) return '—';
-  return `${v.anoFabricacao ?? '—'} / ${v.anoModelo ?? '—'}`;
 }
 
 export function assuntoDoOficio(orgaoNome: string) {
@@ -308,6 +253,67 @@ Respostas a este e-mail são recebidas pelo responsável indicado acima.
       Respostas a este e-mail são recebidas pelo responsável indicado acima.
     </div>
 
+  </div>
+</body>
+</html>`;
+
+  return { texto, html };
+}
+
+/**
+ * Mensagem curta de capa, usada quando o ofício sai como PDF anexado (órgão
+ * com modelo próprio — ver oficio-docx.ts) em vez de HTML completo no corpo.
+ * O texto integral (dados do órgão, tabela de veículos, assinatura) já está
+ * no PDF; repeti-lo aqui seria redundante.
+ */
+export function montarMensagemCurta(dados: DadosDoOficio): { texto: string; html: string } {
+  const { orgao, numeroOficio, protocolo, anexos } = dados;
+  const razao = orgao.razaoSocial || orgao.name;
+  // Quem chama já inclui o PDF do ofício na lista de anexos (junto com
+  // CRLV/contrato) antes de montar `dados` — ver registration-orchestrator.ts.
+  const listaAnexos = anexos;
+
+  const texto = `
+Prezados,
+
+Segue em anexo o Ofício nº ${numeroOficio}, da ${razao}, solicitando isenção
+de pagamento de pedágio para os veículos oficiais relacionados no documento.
+
+Documentação anexa:
+${listaAnexos.map(a => `  - ${a}`).join('\n')}
+
+Atenciosamente,
+${orgao.responsibleName}
+${orgao.responsibleRole || 'Responsável pela frota'} — ${razao}
+
+---
+Ofício nº ${numeroOficio} · Protocolo ${protocolo}
+Respostas a este e-mail são recebidas pelo responsável indicado acima.
+`.trim();
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f2f5f3;">
+  <div style="max-width:600px;margin:0 auto;background:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.65;color:#151a17;padding:32px 36px;">
+    <p style="margin:0 0 14px;">Prezados,</p>
+    <p style="margin:0 0 14px;">
+      Segue em anexo o <strong>Ofício nº ${esc(numeroOficio)}</strong>, da <strong>${esc(razao)}</strong>,
+      solicitando isenção de pagamento de pedágio para os veículos oficiais relacionados no documento.
+    </p>
+    <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#2d5f2e;font-weight:700;margin:22px 0 8px;">Documentação anexa</div>
+    <ul style="margin:8px 0 0;padding-left:20px;font-size:13.5px;">
+      ${listaAnexos.map(a => `<li style="margin-bottom:3px;">${esc(a)}</li>`).join('')}
+    </ul>
+    <p style="margin:24px 0 14px;">Atenciosamente,</p>
+    <div style="font-size:13.5px;">
+      <div style="font-weight:700;">${esc(orgao.responsibleName)}</div>
+      <div style="color:#5c6862;">${esc(orgao.responsibleRole || 'Responsável pela frota')} — ${esc(razao)}</div>
+    </div>
+    <div style="margin-top:22px;padding-top:14px;border-top:1px solid #d8e0db;font-size:11.5px;color:#8a968f;line-height:1.5;">
+      Ofício nº ${esc(numeroOficio)} · Protocolo ${esc(protocolo)}<br>
+      Respostas a este e-mail são recebidas pelo responsável indicado acima.
+    </div>
   </div>
 </body>
 </html>`;
