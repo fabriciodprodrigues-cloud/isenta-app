@@ -167,7 +167,7 @@ async function criarSolicitacao(page, dados, capturar) {
   // direto encontrava 0 inputs, confirmado numa execução real (o texto da
   // página trazia só os links de ajuda e os botões, sem o card). Espera o
   // card renderizar antes de mexer no input.
-  await page.getByText(/documento do ve[íi]culo/i).waitFor({ timeout: 30_000 });
+  await page.getByText('Documento do Veículo', { exact: true }).waitFor({ timeout: 30_000 });
 
   const totalInputsArquivo = await page.locator('input[type="file"]').count();
   console.log('  inputs[type=file] após o card aparecer:', totalInputsArquivo);
