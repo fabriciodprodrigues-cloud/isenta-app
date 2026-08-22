@@ -136,9 +136,15 @@ async function criarSolicitacao(page, dados, capturar) {
     await page.getByRole('button', { name: /^continuar$/i }).click();
   }
 
+  // 3s era curto demais: o clique em "Nova solicitação" mostra um spinner
+  // de carregamento antes de assentar na tela real, e às vezes ainda não
+  // tinha terminado quando essa checagem rodava -- o código então tentava
+  // o passo 1 à toa numa página que já estava (ou ia ficar) no passo 3,
+  // confirmado numa execução real (screenshot do erro mostrava o passo 3
+  // funcionando normalmente, sem erro nenhum).
   const passoDocumentoJaVisivel = await page
     .getByText('Documento do Veículo', { exact: true })
-    .isVisible({ timeout: 3_000 })
+    .isVisible({ timeout: 10_000 })
     .catch(() => false);
 
   if (!passoDocumentoJaVisivel) {
