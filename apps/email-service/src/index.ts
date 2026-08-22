@@ -23,6 +23,19 @@ dotenv.config();
  * guardam a chave mestra, menor a superfície se algum deles vazar.
  */
 
+// Uma falha de conexão IMAP (ex: caixa que só tem o IP do VPS autorizado
+// para SMTP, não para IMAP) pode emitir um evento 'error' assíncrono no
+// socket TLS depois que o try/catch da rota já terminou. Sem um listener
+// global, esse erro sobe como exceção não tratada e derruba o processo
+// inteiro — tirando do ar também /send-email e /convert-docx-to-pdf, que
+// não têm nada a ver com o problema. Loga e segue vivo.
+process.on('uncaughtException', erro => {
+  console.error('Exceção não tratada (processo continua rodando):', erro);
+});
+process.on('unhandledRejection', erro => {
+  console.error('Rejeição de promise não tratada (processo continua rodando):', erro);
+});
+
 const app = express();
 // Limite maior que o padrão (100kb): o ofício de isenção anexa o CRLV de
 // cada veículo da frota em base64, que infla o tamanho em cerca de um terço.
@@ -300,6 +313,11 @@ app.post('/check-emails', exigirSegredo, async (req: Request<{}, {}, CorpoLeitur
     auth: { user, pass: password },
     logger: false,
   });
+
+  // Mesmo com o handler global (ver topo do arquivo), um listener direto no
+  // client evita depender só da rede de segurança — erro de socket vira log,
+  // não exceção não tratada.
+  client.on('error', erro => console.error('Erro de conexão IMAP:', erro));
 
   try {
     await client.connect();
