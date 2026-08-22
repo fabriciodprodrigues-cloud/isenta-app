@@ -202,29 +202,27 @@ async function criarSolicitacao(page, dados, capturar) {
 
   // ---- Passo 4: dados ----
   // Dados pessoais já vêm da conta e ficam bloqueados; preenchemos o endereço
-  // e o veículo.
-  const camposDiagnostico = await page.locator('input').evaluateAll(els =>
-    els.map(el => ({
-      name: el.getAttribute('name'),
-      id: el.id || null,
-      placeholder: el.getAttribute('placeholder'),
-      ariaLabel: el.getAttribute('aria-label'),
-      type: el.getAttribute('type'),
-    }))
-  );
-  console.log('  campos do passo 4:', JSON.stringify(camposDiagnostico));
-
-  await page.getByLabel(/^cep/i).fill(soDigitos(orgao.cep));
-  await page.getByLabel(/^endereço/i).fill(orgao.address ?? '');
-  await page.getByLabel(/^número/i).fill(orgao.numero ?? 'S/N');
+  // e o veículo. Os campos não têm <label> associado (nem por, nem por
+  // aria-label) -- getByLabel nunca ia funcionar aqui. Usa os atributos
+  // `name` reais do formulário, obtidos via diagnóstico numa execução real.
+  // UF não é um <select> nativo, é um componente react-select (combobox com
+  // busca) -- selectOption() não se aplica; abre clicando no placeholder
+  // "Selecione" e escolhe digitando a sigla + Enter.
+  await page.locator('input[name="applicantAddressPostalCode"]').fill(soDigitos(orgao.cep));
+  await page.locator('input[name="applicantAddressStreet"]').fill(orgao.address ?? '');
+  await page.locator('input[name="applicantAddressNumber"]').fill(orgao.numero ?? 'S/N');
   if (orgao.complemento) {
-    await page.getByLabel(/^complemento/i).fill(orgao.complemento);
+    await page.locator('input[name="applicantAddressComplement"]').fill(orgao.complemento);
   }
-  await page.getByLabel(/^bairro/i).fill(orgao.bairro ?? '');
-  await page.getByLabel(/^uf/i).selectOption(orgao.state);
-  await page.getByLabel(/^cidade/i).fill(orgao.city);
+  await page.locator('input[name="applicantAddressNeighbourhood"]').fill(orgao.bairro ?? '');
 
-  await page.getByLabel(/placa do ve[íi]culo/i).fill(veiculo.plate);
+  await page.getByText('Selecione', { exact: true }).click();
+  await page.keyboard.type(orgao.state);
+  await page.keyboard.press('Enter');
+
+  await page.locator('input[name="applicantAddressCity"]').fill(orgao.city);
+
+  await page.locator('input[name="plate"]').fill(veiculo.plate);
 
   // Ao digitar a placa, o portal consulta bases externas e pode encontrar uma
   // TAG Sem Parar. A pergunta só aparece nesse caso.
@@ -240,12 +238,21 @@ async function criarSolicitacao(page, dados, capturar) {
     await capturar('05-tag');
   }
 
-  await preencherSeVazio(page, /^renavam/i, veiculo.renavam);
-  await preencherSeVazio(page, /cor do ve[íi]culo/i, veiculo.cor);
-  await preencherSeVazio(page, /marca do ve[íi]culo/i, veiculo.marca);
-  await preencherSeVazio(page, /modelo do ve[íi]culo/i, veiculo.modelo);
-  await preencherSeVazio(page, /ano fabrica[çc][ãa]o/i, veiculo.anoFabricacao);
-  await preencherSeVazio(page, /ano modelo/i, veiculo.anoModelo);
+  await preencherSeVazio(page.locator('input[name="renavamCode"]'), veiculo.renavam);
+  await preencherSeVazio(page.locator('input[name="color"]'), veiculo.cor);
+  await preencherSeVazio(page.locator('input[name="vehicleBrand"]'), veiculo.marca);
+  await preencherSeVazio(page.locator('input[name="vehicleModel"]'), veiculo.modelo);
+  // Ano Fabricação/Modelo não têm atributo `name` (confirmado no diagnóstico
+  // do Passo 4) -- localiza pelo texto do rótulo e pega o input logo depois
+  // dele no DOM.
+  await preencherSeVazio(
+    page.getByText(/ano fabrica[çc][ãa]o/i).locator('xpath=following::input[1]'),
+    veiculo.anoFabricacao
+  );
+  await preencherSeVazio(
+    page.getByText(/ano modelo/i).locator('xpath=following::input[1]'),
+    veiculo.anoModelo
+  );
 
   await capturar('06-dados');
   await page.getByRole('button', { name: /continuar/i }).click();
@@ -270,10 +277,9 @@ function soDigitos(valor) {
  * sobrescrever o que ele trouxe seria trocar o dado da base oficial pelo
  * nosso, que pode estar desatualizado.
  */
-async function preencherSeVazio(page, rotulo, valor) {
+async function preencherSeVazio(campo, valor) {
   if (valor === null || valor === undefined || valor === '') return;
 
-  const campo = page.getByLabel(rotulo).first();
   const atual = await campo.inputValue().catch(() => '');
 
   if (!atual) await campo.fill(String(valor));
