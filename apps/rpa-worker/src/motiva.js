@@ -15,9 +15,13 @@ const { get } = require('@vercel/blob');
  * estáveis.
  */
 
-// CCR renomeou pra Motiva e o domínio do portal mudou junto — o cadastro
-// real de "Motiva Paraná (ex-PRVias)" no banco já usa este domínio.
-const URL_PORTAL = 'https://isentos.motivapagamentos.com.br';
+// Os dois domínios servem o mesmo site (confirmado ao vivo), mas o app
+// OAuth do login (Azure AD B2C) só tem o redirect_uri do domínio ANTIGO
+// registrado — iniciar por motivapagamentos.com.br derruba o login com
+// AADB2C90006 (redirect_uri_mismatch), confirmado numa execução real contra
+// produção. Cadastrar o novo redirect_uri no Azure é ação de quem administra
+// o portal (fora do nosso controle) — até lá, entrar sempre por este domínio.
+const URL_PORTAL = 'https://isentos.ccrpagamentos.com.br';
 
 /** Nome da concessionária no nosso banco → rótulo no seletor do portal. */
 const NOME_NO_PORTAL = {

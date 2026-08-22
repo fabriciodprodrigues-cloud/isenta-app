@@ -21,9 +21,13 @@ export const PORTAIS: Record<string, DefinicaoPortal> = {
   CCR_MOTIVA: {
     chave: 'CCR_MOTIVA',
     nome: 'Motiva (ex-CCR) — Portal de Isentos',
-    // CCR renomeou pra Motiva e o domínio do portal mudou junto — ver mesmo
-    // ajuste em apps/rpa-worker/src/motiva.js (URL_PORTAL).
-    url: 'https://isentos.motivapagamentos.com.br',
+    // Os dois domínios (motivapagamentos.com.br e ccrpagamentos.com.br)
+    // servem o mesmo site, mas o app OAuth de login só tem o redirect_uri
+    // do domínio antigo registrado no Azure AD B2C — confirmado numa
+    // execução real (login falhava com AADB2C90006 partindo do domínio
+    // novo). Fica em ccrpagamentos.com.br até alguém atualizar o cadastro
+    // do app no Azure.
+    url: 'https://isentos.ccrpagamentos.com.br',
     concessionarias: [
       'AutoBAn',
       'MINAS SP',
@@ -36,7 +40,7 @@ export const PORTAIS: Record<string, DefinicaoPortal> = {
     ],
     automatizado: true,
     instrucaoConta:
-      'Crie a conta em isentos.motivapagamentos.com.br escolhendo "Para sua empresa", com o CNPJ do órgão. O portal envia um código de 6 dígitos por e-mail para confirmar — por isso esta etapa é manual e feita uma única vez.',
+      'Crie a conta em isentos.ccrpagamentos.com.br escolhendo "Para sua empresa", com o CNPJ do órgão. O portal envia um código de 6 dígitos por e-mail para confirmar — por isso esta etapa é manual e feita uma única vez.',
   },
   EPR_PR: {
     chave: 'EPR_PR',
