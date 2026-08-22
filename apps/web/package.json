@@ -11,6 +11,7 @@
     "type-check": "tsc --noEmit",
     "testar-crlv": "tsx scripts/testar-leitura-crlv.ts",
     "testar-oficio-docx": "tsx scripts/testar-oficio-docx.ts",
+    "testar-leitura-respostas": "tsx scripts/testar-leitura-respostas.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",

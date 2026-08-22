@@ -233,12 +233,60 @@ interface CorpoLeitura {
   secure?: boolean;
   user?: string;
   password?: string;
-  /** Quantas mensagens mais recentes trazer. Padrão 10. */
+  /** Quantas mensagens mais recentes trazer quando não há cursor. Padrão 10. */
   limite?: number;
+  /** UID da última mensagem já processada. Se definido, busca só UID maior
+   *  que este valor em vez das N mais recentes — leitura incremental. */
+  uidInicial?: number;
+  /** Bytes máximos a baixar do corpo de cada mensagem. Padrão 20000 — dá
+   *  folga pra achar o protocolo mesmo com thread citada longa, sem baixar
+   *  anexos pesados nem imagens embutidas em base64. */
+  limiteBytesCorpo?: number;
+}
+
+interface ParteEncontrada {
+  part: string;
+  tipo: 'text/plain' | 'text/html';
+}
+
+/**
+ * Caminha a bodyStructure em busca de uma parte textual, preferindo
+ * text/plain — text/html só como plano B, com as tags removidas de forma
+ * crua (não é um parser de verdade, só o bastante pra achar protocolo e
+ * palavra-chave de aprovação/recusa).
+ */
+function encontrarParteTexto(struct: any): ParteEncontrada | null {
+  if (!struct) return null;
+
+  // Mensagem simples (não multipart): não tem childNodes. O seletor 'TEXT'
+  // do IMAP substitui o número de parte nesse caso.
+  if (!struct.childNodes) {
+    if (struct.type === 'text/plain' || struct.type === 'text/html') {
+      return { part: struct.part || 'TEXT', tipo: struct.type };
+    }
+    return null;
+  }
+
+  let candidatoHtml: ParteEncontrada | null = null;
+  for (const filho of struct.childNodes) {
+    const achado = encontrarParteTexto(filho);
+    if (achado?.tipo === 'text/plain') return achado;
+    if (achado?.tipo === 'text/html' && !candidatoHtml) candidatoHtml = achado;
+  }
+  return candidatoHtml;
+}
+
+async function streamParaString(stream: NodeJS.ReadableStream): Promise<string> {
+  const pedacos: Buffer[] = [];
+  for await (const pedaco of stream) {
+    pedacos.push(Buffer.isBuffer(pedaco) ? pedaco : Buffer.from(pedaco));
+  }
+  return Buffer.concat(pedacos).toString('utf8');
 }
 
 app.post('/check-emails', exigirSegredo, async (req: Request<{}, {}, CorpoLeitura>, res: Response) => {
-  const { host, port: portaImap, secure, user, password, limite } = req.body ?? {};
+  const { host, port: portaImap, secure, user, password, limite, uidInicial, limiteBytesCorpo } =
+    req.body ?? {};
 
   if (!host || !user || !password) {
     res.status(400).json({ erro: 'Campos obrigatórios: host, user, password.' });
@@ -258,27 +306,77 @@ app.post('/check-emails', exigirSegredo, async (req: Request<{}, {}, CorpoLeitur
     const mailbox = await client.mailboxOpen('INBOX');
 
     const total = mailbox.exists;
-    const quantos = Math.min(Number(limite) || 10, total);
-    const mensagens: Array<{ uid: number; de: string; assunto: string; data: string | null }> = [];
+    const mensagens: Array<{
+      uid: number;
+      de: string;
+      assunto: string;
+      data: string | null;
+      corpo: string | null;
+    }> = [];
+    let uidMaisAlto: number | null = null;
+
+    // Leitura incremental (uidInicial definido): busca só UID maior que o
+    // cursor, por UID em vez de posição sequencial — a posição muda quando
+    // mensagens são apagadas, o UID não. Sem cursor: comportamento antigo,
+    // as N mais recentes por posição sequencial.
+    const usaCursor = typeof uidInicial === 'number';
+    const intervalo = usaCursor
+      ? `${uidInicial + 1}:*`
+      : (() => {
+          const quantos = Math.min(Number(limite) || 10, total);
+          return `${Math.max(1, total - quantos + 1)}:${total}`;
+        })();
 
     if (total > 0) {
       // client.fetch() devolve um gerador assíncrono, não um array — atribuir
       // direto a uma variável (como no rascunho anterior) serializava vazio.
-      const intervalo = `${Math.max(1, total - quantos + 1)}:${total}`;
-      for await (const msg of client.fetch(intervalo, { envelope: true, uid: true })) {
+      for await (const msg of client.fetch(
+        intervalo,
+        { envelope: true, uid: true, bodyStructure: true },
+        usaCursor ? { uid: true } : undefined
+      )) {
+        // Defesa contra servidores IMAP que respondem de forma inconsistente
+        // quando o range pedido (UID > cursor) não tem mensagem nenhuma —
+        // alguns devolvem a última existente em vez de nada.
+        if (usaCursor && msg.uid <= uidInicial!) continue;
+
+        if (uidMaisAlto === null || msg.uid > uidMaisAlto) uidMaisAlto = msg.uid;
+
+        let corpo: string | null = null;
+        const parte = encontrarParteTexto(msg.bodyStructure);
+        if (parte) {
+          try {
+            const baixado = await client.download(msg.uid, parte.part, {
+              uid: true,
+              maxBytes: limiteBytesCorpo ?? 20_000,
+            });
+            const bruto = await streamParaString(baixado.content);
+            corpo = parte.tipo === 'text/html' ? bruto.replace(/<[^>]+>/g, ' ') : bruto;
+          } catch {
+            // parte pode não existir mais / erro de decodificação — segue sem corpo
+          }
+        }
+
         mensagens.push({
           uid: msg.uid,
           de: msg.envelope?.from?.[0]?.address ?? '',
           assunto: msg.envelope?.subject ?? '',
           data: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
+          corpo,
         });
       }
     }
 
     await client.logout();
     // Mais recente primeiro — é o que importa ao procurar um código que
-    // acabou de chegar.
-    res.status(200).json({ mensagens: mensagens.reverse() });
+    // acabou de chegar (mantido pra não quebrar quem já consome esta rota
+    // sem cursor).
+    res.status(200).json({
+      mensagens: mensagens.reverse(),
+      // BigInt não serializa em JSON — Express lança exceção sem o toString().
+      uidValidity: mailbox.uidValidity.toString(),
+      uidMaisAlto,
+    });
   } catch (erro) {
     console.error('Erro ao verificar e-mails:', erro);
     res.status(502).json({

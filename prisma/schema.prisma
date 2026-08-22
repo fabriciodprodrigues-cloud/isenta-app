@@ -61,6 +61,16 @@ model Account {
   emailVerifHash     String?
   emailVerifExpira   DateTime?
 
+  // --- Leitura de respostas por IMAP ---
+  // Maior UID já processado nesta caixa; null = nunca lida (a primeira
+  // leitura traz só as últimas mensagens, não o histórico inteiro).
+  imapUltimoUidLido  Int?
+  // UIDVALIDITY da caixa na última leitura. Se mudar, os UIDs anteriores
+  // podem não corresponder mais às mesmas mensagens — o cursor é
+  // descartado e a leitura recomeça do zero (lib/processar-respostas.ts).
+  // BigInt porque a lib IMAP expõe esse valor como BigInt.
+  imapUidValidity    BigInt?
+
   // --- Papel timbrado ---
   timbreUrl          String?  // pathname do arquivo no Blob privado
   cabecalhoTexto     String?  // ex: nome da secretaria
@@ -87,9 +97,56 @@ model Account {
   alerts       Alert[]
   autorizacao  TermoAutorizacao?
   portais      PortalCredencial[]
+  respostasRecebidas EmailRespostaRecebida[]
 
   @@index([cnpj])
   @@index([status])
+}
+
+/// Um e-mail de resposta lido da caixa institucional do órgão, ainda não
+/// confirmado por um humano.
+///
+/// Nunca aplica status em ConcesssionaireRegistration sozinho — mesmo com
+/// classificação "óbvia", existe sempre um clique de confirmação antes,
+/// pelo mesmo princípio já usado na leitura de CRLV
+/// (lib/leitura-crlv-texto.ts): extração automática é palpite, não decisão.
+model EmailRespostaRecebida {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  /// UID da mensagem na caixa do órgão — dedupe e continuidade do cursor.
+  imapUid     Int
+  remetente   String
+  assunto     String
+  recebidoEm  DateTime?
+
+  /// Trecho do corpo (texto), truncado — o bastante pra dar contexto na
+  /// tela sem guardar o e-mail inteiro.
+  corpoResumo String?
+
+  /// Protocolo (formato ISN-AAAA-XXXXXX) encontrado no assunto ou corpo.
+  protocoloDetectado     String?
+  /// aprovado | recusado | indefinido — palpite do classificador, nunca
+  /// aplicado sozinho.
+  classificacaoDetectada String
+
+  /// ConcesssionaireRegistration que bateriam pelo protocolo — pode ser
+  /// mais de uma (um protocolo cobre o lote inteiro enviado junto).
+  registrationIds String[]
+
+  status         String    @default("pendente") // pendente | confirmado | ignorado
+  /// O que o humano de fato escolheu — pode divergir de classificacaoDetectada.
+  confirmadoComo String?   // aprovado | recusado
+  confirmadoPor  String?   // e-mail do usuário admin
+  confirmadoEm   DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([accountId, imapUid])
+  @@index([accountId])
+  @@index([status])
+  @@index([protocoloDetectado])
 }
 
 /// Acesso do órgão a um portal de concessionária.

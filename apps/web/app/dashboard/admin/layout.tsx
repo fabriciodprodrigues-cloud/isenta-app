@@ -17,6 +17,7 @@ export default function AdminLayout({
     { href: '/dashboard/admin/orgaos', label: 'Órgãos', icon: '🏛️' },
     { href: '/dashboard/admin/frota', label: 'Frota', icon: '🚗' },
     { href: '/dashboard/admin/cadastros', label: 'Cadastros', icon: '📋' },
+    { href: '/dashboard/admin/respostas', label: 'Respostas', icon: '📥' },
     { href: '/dashboard/admin/concessionarias', label: 'Concessionárias', icon: '🛣️' },
     { href: '/dashboard/admin/tags', label: 'TAGs', icon: '🏷️' },
     { href: '/dashboard/admin/relatorios', label: 'Relatórios', icon: '📈' },
