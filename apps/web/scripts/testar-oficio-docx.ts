@@ -45,6 +45,7 @@ const dadosDeExemplo: DadosDoOficio = {
       cor: 'Branco',
       anoFabricacao: 2022,
       anoModelo: 2023,
+      tag: '07519786249',
     },
     {
       plate: 'NRL-9H10',
@@ -56,6 +57,7 @@ const dadosDeExemplo: DadosDoOficio = {
       cor: 'Branco',
       anoFabricacao: 2021,
       anoModelo: 2021,
+      tag: null,
     },
   ],
   anexos: ['CRLV - SMF-6F91.pdf', 'CRLV - NRL-9H10.pdf', 'Contrato - NRL-9H10.pdf'],

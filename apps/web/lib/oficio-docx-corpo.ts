@@ -50,8 +50,8 @@ function paragrafoVazio(): string {
 }
 
 function tabelaVeiculos(lista: VeiculoDoOficio[], titulo: string, prazo: number): string {
-  const cabecalho = ['Placa', 'RENAVAM', 'Marca/Modelo', 'Cor', 'Ano fab./mod.', 'Categoria'];
-  const larguras = [1300, 1500, 2600, 1200, 1600, 1200]; // DXA, soma ~9400
+  const cabecalho = ['Placa', 'RENAVAM', 'Marca/Modelo', 'Cor', 'Ano fab./mod.', 'Categoria', 'TAG'];
+  const larguras = [1300, 1500, 2100, 1200, 1400, 1000, 900]; // DXA, soma ~9400
 
   const linhaCabecalho = `<w:tr>${cabecalho
     .map(
@@ -71,6 +71,7 @@ function tabelaVeiculos(lista: VeiculoDoOficio[], titulo: string, prazo: number)
         v.cor ?? '—',
         anos(v),
         ROTULO_CATEGORIA[v.category] ?? v.category,
+        v.tag ?? '—',
       ];
       return `<w:tr>${celulas
         .map(

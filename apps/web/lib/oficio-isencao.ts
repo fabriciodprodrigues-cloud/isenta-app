@@ -73,7 +73,8 @@ export function montarOficio(dados: DadosDoOficio): { texto: string; html: strin
       .map(
         v =>
           `  - Placa ${v.plate} | RENAVAM ${v.renavam} | ${nomeVeiculo(v)} | ` +
-          `Cor ${v.cor ?? '—'} | Ano ${anos(v)} | ${ROTULO_CATEGORIA[v.category] ?? v.category}`
+          `Cor ${v.cor ?? '—'} | Ano ${anos(v)} | ${ROTULO_CATEGORIA[v.category] ?? v.category} | ` +
+          `TAG ${v.tag ?? '—'}`
       )
       .join('\n');
 
@@ -146,6 +147,7 @@ Respostas a este e-mail são recebidas pelo responsável indicado acima.
               <td style="padding:8px 10px;border:1px solid #d8e0db;">${esc(v.cor ?? '—')}</td>
               <td style="padding:8px 10px;border:1px solid #d8e0db;white-space:nowrap;">${esc(anos(v))}</td>
               <td style="padding:8px 10px;border:1px solid #d8e0db;white-space:nowrap;">${esc(ROTULO_CATEGORIA[v.category] ?? v.category)}</td>
+              <td style="padding:8px 10px;border:1px solid #d8e0db;font-family:monospace;white-space:nowrap;">${esc(v.tag ?? '—')}</td>
             </tr>`
       )
       .join('');
@@ -163,6 +165,7 @@ Respostas a este e-mail são recebidas pelo responsável indicado acima.
             <th style="text-align:left;background:#e8f0e8;padding:8px 10px;border:1px solid #d8e0db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Cor</th>
             <th style="text-align:left;background:#e8f0e8;padding:8px 10px;border:1px solid #d8e0db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Ano fab./mod.</th>
             <th style="text-align:left;background:#e8f0e8;padding:8px 10px;border:1px solid #d8e0db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">Categoria</th>
+            <th style="text-align:left;background:#e8f0e8;padding:8px 10px;border:1px solid #d8e0db;font-size:11px;text-transform:uppercase;letter-spacing:.04em;">TAG</th>
           </tr>
         </thead>
         <tbody>${linhasHtml(lista)}</tbody>

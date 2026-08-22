@@ -20,6 +20,8 @@ export interface VeiculoDoOficio {
   cor: string | null;
   anoFabricacao: number | null;
   anoModelo: number | null;
+  /** Número de série da TAG vinculada (Tag.vehicleId) — null se não houver. */
+  tag: string | null;
 }
 
 export interface OrgaoDoOficio {

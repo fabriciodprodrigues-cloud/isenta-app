@@ -211,6 +211,7 @@ export async function processRegistration(
           anoModelo: true,
           account: true,
           documents: { select: { type: true, fileName: true, url: true } },
+          tags: { select: { serialNumber: true } },
         },
       },
     },
@@ -268,6 +269,7 @@ export async function processRegistration(
     cor: r.vehicle.cor,
     anoFabricacao: r.vehicle.anoFabricacao,
     anoModelo: r.vehicle.anoModelo,
+    tag: r.vehicle.tags[0]?.serialNumber ?? null,
   }));
 
   // Um anexo por documento relevante, nomeado com a placa para a
