@@ -101,7 +101,15 @@ async function entrar(page, credencial) {
 async function criarSolicitacao(page, dados, capturar) {
   const { concessionariaRotulo, veiculo, orgao, temTagNoSistema, arquivoCrlv } = dados;
 
-  await page.goto(`${URL_PORTAL}/solicitacao`, { waitUntil: 'domcontentloaded' });
+  // Usa a origem de onde o login deixou a página, não URL_PORTAL fixo: o
+  // Azure B2C pode devolver pra ccrpagamentos.com.br OU motivapagamentos.com.br
+  // (ver entrar()), e a sessão só vale no domínio onde o cookie foi setado.
+  // Forçar o domínio fixo aqui derrubava a sessão silenciosamente — o goto
+  // caía na home deslogada e o clique no combobox nunca achava nada,
+  // confirmado numa execução real.
+  const origemAutenticada = new URL(page.url()).origin;
+
+  await page.goto(`${origemAutenticada}/solicitacao`, { waitUntil: 'domcontentloaded' });
   await capturar('01-inicio');
 
   // ---- Passo 1: concessionária ----
