@@ -73,7 +73,11 @@ async function entrar(page, credencial) {
   // O login é Azure AD B2C, em outro domínio.
   await page.waitForURL(/b2clogin\.com/, { timeout: 30_000 });
 
-  await page.getByLabel(/e-?mail/i).fill(credencial.usuario);
+  // getByLabel(/e-?mail/i) sozinho casa com dois elementos: o campo e o
+  // <form> ao redor, cujo aria-label também contém "e-mail" ("Sign in with
+  // your e-mail") — confirmado numa execução real contra o portal.
+  // Interseção com getByRole('textbox') restringe ao campo de fato.
+  await page.getByLabel(/e-?mail/i).and(page.getByRole('textbox')).fill(credencial.usuario);
   await page.getByLabel(/senha/i).fill(credencial.senha);
   await page.getByRole('button', { name: /^entrar$/i }).click();
 
