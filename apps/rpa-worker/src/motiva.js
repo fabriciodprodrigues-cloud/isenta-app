@@ -136,18 +136,28 @@ async function criarSolicitacao(page, dados, capturar) {
     await page.getByRole('button', { name: /^continuar$/i }).click();
   }
 
-  // 3s era curto demais: o clique em "Nova solicitação" mostra um spinner
-  // de carregamento antes de assentar na tela real, e às vezes ainda não
-  // tinha terminado quando essa checagem rodava -- o código então tentava
-  // o passo 1 à toa numa página que já estava (ou ia ficar) no passo 3,
-  // confirmado numa execução real (screenshot do erro mostrava o passo 3
-  // funcionando normalmente, sem erro nenhum).
-  const passoDocumentoJaVisivel = await page
-    .getByText('Documento do Veículo', { exact: true })
-    .isVisible({ timeout: 10_000 })
-    .catch(() => false);
+  // isVisible({ timeout }) não espera de verdade -- é uma checagem imediata
+  // do estado atual do DOM, o parâmetro timeout não faz polling. Depois do
+  // clique em "Nova solicitação" (que mostra um spinner antes de assentar),
+  // uma checagem imediata quase sempre pegava a página no meio do
+  // carregamento e concluía errado que ainda estava no passo 1 -- mesmo
+  // aumentando pra 10s, confirmado numa execução real (screenshot do "erro"
+  // mostrava o passo 3 funcionando normalmente, sem problema nenhum). Espera
+  // de verdade por um dos dois indicadores (combobox do passo 1, ou card do
+  // passo 3), o que aparecer primeiro decide o caminho.
+  const indicador = await Promise.race([
+    page
+      .getByText('Documento do Veículo', { exact: true })
+      .waitFor({ timeout: 15_000 })
+      .then(() => 'documento'),
+    page
+      .getByRole('combobox')
+      .first()
+      .waitFor({ timeout: 15_000 })
+      .then(() => 'combobox'),
+  ]).catch(() => null);
 
-  if (!passoDocumentoJaVisivel) {
+  if (indicador === 'combobox') {
     // ---- Passo 1: concessionária ----
     await page.getByRole('combobox').first().click();
     await page.getByText(concessionariaRotulo, { exact: true }).click();
