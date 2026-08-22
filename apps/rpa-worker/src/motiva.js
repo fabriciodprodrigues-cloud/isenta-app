@@ -130,10 +130,23 @@ async function criarSolicitacao(page, dados, capturar) {
   // Uma tentativa anterior interrompida no meio do preenchimento deixa um
   // rascunho salvo no portal: o clique em "Nova solicitação" mostra um
   // modal perguntando se quer continuar de onde parou ou reiniciar, em vez
-  // de ir direto pro formulário.
-  const modalRascunho = page.getByText(/seja bem.?vindo/i);
-  if (await modalRascunho.isVisible({ timeout: 5_000 }).catch(() => false)) {
+  // de ir direto pro formulário. isVisible({ timeout }) não faz polling de
+  // verdade (mesmo problema já visto na detecção do passo) -- usa waitFor,
+  // que espera de verdade. Depois de clicar Continuar, espera o overlay
+  // escuro do modal sumir de vez antes de seguir: confirmado numa execução
+  // real que o clique seguinte (no combobox do passo 1) era bloqueado pelo
+  // overlay do modal, que ainda estava fechando.
+  const modalApareceu = await page
+    .getByText(/seja bem.?vindo/i)
+    .waitFor({ timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (modalApareceu) {
     await page.getByRole('button', { name: /^continuar$/i }).click();
+    await page
+      .locator('.container-modal-gateway__overlay')
+      .waitFor({ state: 'hidden', timeout: 10_000 })
+      .catch(() => {});
   }
 
   // O rascunho pode retomar em qualquer um dos 4 passos, não só "passo 1
