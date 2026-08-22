@@ -216,7 +216,11 @@ async function criarSolicitacao(page, dados, capturar) {
   }
   await page.locator('input[name="applicantAddressNeighbourhood"]').fill(orgao.bairro ?? '');
 
-  await page.getByText('Selecione', { exact: true }).click();
+  // O texto "Selecione" fica atrás do próprio container do react-select
+  // (.select__input-container), que intercepta o clique -- confirmado numa
+  // execução real (Playwright reportou o intercept e ficou tentando por
+  // 30s). Clica no container por cima em vez do texto embaixo dele.
+  await page.locator('.select__input-container').first().click();
   await page.keyboard.type(orgao.state);
   await page.keyboard.press('Enter');
 
