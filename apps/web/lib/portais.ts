@@ -21,7 +21,9 @@ export const PORTAIS: Record<string, DefinicaoPortal> = {
   CCR_MOTIVA: {
     chave: 'CCR_MOTIVA',
     nome: 'Motiva (ex-CCR) — Portal de Isentos',
-    url: 'https://isentos.ccrpagamentos.com.br',
+    // CCR renomeou pra Motiva e o domínio do portal mudou junto — ver mesmo
+    // ajuste em apps/rpa-worker/src/motiva.js (URL_PORTAL).
+    url: 'https://isentos.motivapagamentos.com.br',
     concessionarias: [
       'AutoBAn',
       'MINAS SP',
@@ -34,7 +36,7 @@ export const PORTAIS: Record<string, DefinicaoPortal> = {
     ],
     automatizado: true,
     instrucaoConta:
-      'Crie a conta em isentos.ccrpagamentos.com.br escolhendo "Para sua empresa", com o CNPJ do órgão. O portal envia um código de 6 dígitos por e-mail para confirmar — por isso esta etapa é manual e feita uma única vez.',
+      'Crie a conta em isentos.motivapagamentos.com.br escolhendo "Para sua empresa", com o CNPJ do órgão. O portal envia um código de 6 dígitos por e-mail para confirmar — por isso esta etapa é manual e feita uma única vez.',
   },
   EPR_PR: {
     chave: 'EPR_PR',

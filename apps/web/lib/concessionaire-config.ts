@@ -22,7 +22,7 @@ export const CONCESSIONAIRE_CHANNELS: Record<string, ConcessionaireConfig> = {
     id: 'cmsaonwl9000cz911ybc9d7p0',
     name: 'CCR PRVias',
     channel: 'portal',
-    portalUrl: 'isentos.ccrpagamentos.com.br',
+    portalUrl: 'isentos.motivapagamentos.com.br',
     description: 'Integração futura via portal web/RPA',
   },
   'Way 262': {
