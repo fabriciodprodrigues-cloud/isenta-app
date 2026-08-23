@@ -57,6 +57,9 @@ export default function ConcessionariasPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [aprovandoId, setAprovandoId] = useState<string | null>(null);
+  const [dataAprovacao, setDataAprovacao] = useState('');
+  const [salvandoAprovacao, setSalvandoAprovacao] = useState(false);
 
   useEffect(() => {
     // Admin não tem acesso a esta página
@@ -128,6 +131,44 @@ export default function ConcessionariasPage() {
       setSendingId(null);
     }
   };
+
+  async function recarregarRegistrations() {
+    if (!session?.user?.accountId) return;
+    const res = await fetch(`/api/registrations?accountId=${session.user.accountId}`);
+    const data = await res.json();
+    setRegistrations(data);
+  }
+
+  function abrirModalAprovar(registrationId: string) {
+    setAprovandoId(registrationId);
+    setDataAprovacao(new Date().toISOString().slice(0, 10));
+  }
+
+  async function confirmarAprovacaoManual() {
+    if (!aprovandoId) return;
+
+    try {
+      setSalvandoAprovacao(true);
+      const response = await fetch(`/api/registrations/${aprovandoId}/aprovar-manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approvedAt: dataAprovacao }),
+      });
+
+      if (response.ok) {
+        await recarregarRegistrations();
+        setAprovandoId(null);
+      } else {
+        const erro = await response.json().catch(() => null);
+        alert(erro?.error || 'Erro ao marcar como aprovado');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao marcar como aprovado');
+    } finally {
+      setSalvandoAprovacao(false);
+    }
+  }
 
   if (loading) {
     return <div className="text-paper">Carregando...</div>;
@@ -240,7 +281,19 @@ export default function ConcessionariasPage() {
                             {sendingId === reg.id ? 'Enviando...' : 'Enviar'}
                           </Button>
                         )}
-                        {reg.status !== 'rascunho' && <span className="text-paper-dim text-xs">—</span>}
+                        {(reg.status === 'enviado' || reg.status === 'aguardando_resposta') && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => abrirModalAprovar(reg.id)}
+                            className="text-xs"
+                          >
+                            Marcar como aprovado
+                          </Button>
+                        )}
+                        {(reg.status === 'aprovado' || reg.status === 'recusado') && (
+                          <span className="text-paper-dim text-xs">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -319,6 +372,35 @@ export default function ConcessionariasPage() {
           <Button>Ver Frota →</Button>
         </Link>
       </div>
+
+      {/* Modal de aprovação manual */}
+      {aprovandoId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-lg border border-white/10 bg-ink-900 p-6 text-paper">
+            <h3 className="text-xl font-semibold mb-2">Marcar como aprovado</h3>
+            <p className="text-paper-dim text-sm mb-4">
+              Use quando a aprovação aconteceu fora do sistema (por telefone, direto no
+              portal da concessionária, etc.). Informe a data em que ela foi concedida.
+            </p>
+            <label className="block text-sm text-paper mb-1">Data da aprovação</label>
+            <input
+              type="date"
+              value={dataAprovacao}
+              onChange={(e) => setDataAprovacao(e.target.value)}
+              max={new Date().toISOString().slice(0, 10)}
+              className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+            />
+            <div className="mt-6 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setAprovandoId(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={confirmarAprovacaoManual} disabled={salvandoAprovacao || !dataAprovacao}>
+                {salvandoAprovacao ? 'Salvando...' : 'Confirmar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {showModal && (
