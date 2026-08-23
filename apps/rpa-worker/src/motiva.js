@@ -285,6 +285,15 @@ async function criarSolicitacao(page, dados, capturar) {
   await page.getByRole('button', { name: /enviar solicita[çc][ãa]o/i }).click();
   await page.waitForTimeout(5_000);
   await capturar('08-enviado');
+
+  // A tela de confirmação mostra "Nº do processo: 0000042786" -- guarda pra
+  // conseguir rastrear a solicitação depois, em vez de ficar só com a
+  // confirmação visual da captura.
+  const textoConfirmacao = await page.getByText(/n[ºo]\s*do processo/i).textContent().catch(() => null);
+  const protocolo = textoConfirmacao?.match(/(\d{6,})/)?.[1] ?? null;
+  console.log('  protocolo do processo:', protocolo ?? '(não encontrado)');
+
+  return { protocolo };
 }
 
 function soDigitos(valor) {

@@ -129,7 +129,7 @@ async function processar(registro, navegador) {
       capturar
     );
 
-    await motiva.criarSolicitacao(
+    const { protocolo } = await motiva.criarSolicitacao(
       page,
       {
         concessionariaRotulo: rotulo,
@@ -147,6 +147,7 @@ async function processar(registro, navegador) {
       where: { id: registro.id },
       data: {
         status: 'enviado',
+        protocol: protocolo,
         sentAt: new Date(),
         rpaTentativas: { increment: 1 },
         rpaExecutadoEm: new Date(),
