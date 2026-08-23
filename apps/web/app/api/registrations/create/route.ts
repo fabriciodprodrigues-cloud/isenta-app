@@ -82,6 +82,7 @@ export async function POST(request: Request) {
         ativoParaCadastro: true,
         tipoCanal: true,
         canalIsentos: true,
+        permiteSolicitacoesIlimitadas: true,
       },
     });
 
@@ -101,19 +102,24 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verificar se já existe registração
-    const existingRegistration = await prisma.concesssionaireRegistration.findFirst({
-      where: {
-        vehicleId,
-        concessionaireId,
-      },
-    });
+    // Verificar se já existe registração. Concessionária de demonstração
+    // (permiteSolicitacoesIlimitadas) fica de fora dessa checagem -- serve
+    // pra repetir o fluxo de e-mail em demonstrações pra outros órgãos, sem
+    // esbarrar em "já existe uma solicitação" a cada tentativa.
+    if (!concessionaire.permiteSolicitacoesIlimitadas) {
+      const existingRegistration = await prisma.concesssionaireRegistration.findFirst({
+        where: {
+          vehicleId,
+          concessionaireId,
+        },
+      });
 
-    if (existingRegistration) {
-      return NextResponse.json(
-        { error: 'Já existe uma solicitação para este veículo nesta concessionária' },
-        { status: 409 }
-      );
+      if (existingRegistration) {
+        return NextResponse.json(
+          { error: 'Já existe uma solicitação para este veículo nesta concessionária' },
+          { status: 409 }
+        );
+      }
     }
 
     // Criar nova solicitação
