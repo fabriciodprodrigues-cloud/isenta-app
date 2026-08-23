@@ -288,9 +288,13 @@ async function criarSolicitacao(page, dados, capturar) {
 
   // A tela de confirmação mostra "Nº do processo: 0000042786" -- guarda pra
   // conseguir rastrear a solicitação depois, em vez de ficar só com a
-  // confirmação visual da captura.
-  const textoConfirmacao = await page.getByText(/n[ºo]\s*do processo/i).textContent().catch(() => null);
-  const protocolo = textoConfirmacao?.match(/(\d{6,})/)?.[1] ?? null;
+  // confirmação visual da captura. O rótulo e o número ficam em elementos
+  // separados no DOM (mesmo problema de match ambíguo já visto em outros
+  // pontos) -- getByText só pegava o rótulo e o textContent() saía sem o
+  // número, confirmado numa execução real. Varre o texto da página inteira
+  // em vez de tentar acertar o elemento exato.
+  const textoTela = await page.innerText('body').catch(() => '');
+  const protocolo = textoTela.match(/n[ºo]\s*do processo:?\s*(\d{6,})/i)?.[1] ?? null;
   console.log('  protocolo do processo:', protocolo ?? '(não encontrado)');
 
   return { protocolo };
