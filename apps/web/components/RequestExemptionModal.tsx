@@ -115,6 +115,7 @@ export function RequestExemptionModal({
     try {
       let successCount = 0;
       const motivos = new Set<string>();
+      const motivosEnvio = new Set<string>();
 
       for (const vehicleId of selectedVehicles) {
         for (const concessionaireId of selectedConcessionaires) {
@@ -130,6 +131,12 @@ export function RequestExemptionModal({
 
             if (response.ok) {
               successCount++;
+              // A criação já tenta enviar (e-mail) ou acordar o robô (portal)
+              // na hora -- quando não dá (identidade incompleta, documento
+              // faltando etc.), a solicitação continua criada como rascunho,
+              // mas o motivo precisa aparecer aqui em vez de sumir.
+              const corpo = await response.json().catch(() => null);
+              if (corpo?.envioMotivo) motivosEnvio.add(corpo.envioMotivo);
             } else {
               // Sem isto o usuário via apenas "N falharam" e não tinha como
               // saber se foi duplicidade, concessionária inapta ou permissão.
@@ -149,6 +156,12 @@ export function RequestExemptionModal({
             ? `${successCount} solicitações criadas. Não foi possível criar as demais: ${lista}`
             : `Nenhuma solicitação criada: ${lista}`
         );
+      } else if (motivosEnvio.size > 0) {
+        setError(
+          `${successCount} solicitações criadas, mas o envio automático não completou para algumas: ` +
+          Array.from(motivosEnvio).join('; ')
+        );
+        onSuccess();
       } else {
         onSuccess();
         onClose();

@@ -1,6 +1,7 @@
 const os = require('os');
 const path = require('path');
 const fs = require('fs/promises');
+const http = require('http');
 const { chromium } = require('playwright');
 const { put } = require('@vercel/blob');
 const { PrismaClient } = require('@prisma/client');
@@ -226,6 +227,64 @@ async function rodada() {
   return { enviados, falhas };
 }
 
+// --- Gatilho HTTP opcional ---
+//
+// Por padrão o worker só olha o banco a cada RPA_INTERVALO_MS (5 min): uma
+// solicitação criada agora podia esperar até 5 minutos pro robô notar.
+// Quando o app web tem como chamar este endpoint (precisa de domínio
+// público no Railway, que não existe por padrão pra um worker sem porta),
+// ele acorda o loop na hora em vez de esperar o próximo ciclo.
+//
+// `executando`/`pedidoExtra` evitam rodar duas rodadas em paralelo: dois
+// navegadores mexendo na mesma conta ao mesmo tempo foi exatamente o que
+// causou os EXISTING_DRAFT_ERROR investigados nos testes reais. Um gatilho
+// que chega no meio de uma rodada só marca `pedidoExtra` -- a rodada atual
+// termina normal, e o loop pula a espera e roda de novo na sequência.
+const PORT = process.env.PORT;
+const RPA_TRIGGER_SECRET = process.env.RPA_TRIGGER_SECRET;
+
+let executando = false;
+let pedidoExtra = false;
+let resolverEspera = null;
+
+function dispararAgora() {
+  if (executando) {
+    pedidoExtra = true;
+    return;
+  }
+  if (resolverEspera) {
+    resolverEspera();
+    resolverEspera = null;
+  }
+}
+
+function iniciarServidorDeGatilho() {
+  // Sem PORT, o Railway não expôs domínio público pra este serviço -- não
+  // faz sentido escutar em lugar nenhum.
+  if (!PORT) return;
+
+  http
+    .createServer((req, res) => {
+      if (req.method !== 'POST' || req.url !== '/disparar') {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+
+      if (RPA_TRIGGER_SECRET && req.headers.authorization !== `Bearer ${RPA_TRIGGER_SECRET}`) {
+        res.writeHead(401);
+        res.end();
+        return;
+      }
+
+      res.writeHead(202);
+      res.end('ok');
+      log('gatilho recebido -- pulando a espera até o próximo ciclo');
+      dispararAgora();
+    })
+    .listen(PORT, () => log(`gatilho HTTP ouvindo na porta ${PORT}`));
+}
+
 async function main() {
   const umaVez = process.argv.includes('--uma-vez');
 
@@ -250,6 +309,8 @@ async function main() {
     return;
   }
 
+  iniciarServidorDeGatilho();
+
   let parando = false;
   process.on('SIGTERM', () => {
     log('encerrando após a rodada atual...');
@@ -257,6 +318,7 @@ async function main() {
   });
 
   while (!parando) {
+    executando = true;
     try {
       await rodada();
     } catch (erro) {
@@ -264,9 +326,22 @@ async function main() {
       // sobreviver a instabilidade de rede ou banco.
       log('erro na rodada:', erro.message);
     }
+    executando = false;
 
     if (parando) break;
-    await new Promise(r => setTimeout(r, INTERVALO_MS));
+
+    if (pedidoExtra) {
+      pedidoExtra = false;
+      continue;
+    }
+
+    await new Promise(resolve => {
+      resolverEspera = resolve;
+      setTimeout(() => {
+        resolverEspera = null;
+        resolve();
+      }, INTERVALO_MS);
+    });
   }
 
   await prisma.$disconnect();

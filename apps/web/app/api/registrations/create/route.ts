@@ -1,9 +1,42 @@
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { processRegistration } from '@/lib/registration-orchestrator';
+import { portalDoCanal } from '@/lib/portais';
 import { NextResponse } from 'next/server';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
+
+// O envio por e-mail acontece na mesma requisição (ver send/route.ts -- não
+// há fila em produção), então esta rota também pode demorar.
+export const maxDuration = 60;
+
+/**
+ * Acorda o robô de RPA na hora em vez de deixar a solicitação esperando o
+ * próximo ciclo de RPA_INTERVALO_MS (5 min por padrão). Só funciona se o
+ * worker tiver domínio público configurado no Railway e as duas variáveis
+ * abaixo apontarem pra ele -- sem isso, o robô continua pegando a
+ * solicitação sozinho no próximo ciclo, só que sem essa aceleração.
+ */
+async function dispararRpaAgora(): Promise<void> {
+  const url = process.env.RPA_WORKER_URL;
+  if (!url) return;
+
+  try {
+    await fetch(`${url.replace(/\/$/, '')}/disparar`, {
+      method: 'POST',
+      headers: process.env.RPA_TRIGGER_SECRET
+        ? { Authorization: `Bearer ${process.env.RPA_TRIGGER_SECRET}` }
+        : {},
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (erro) {
+    // Best-effort: se o gatilho falhar (worker fora do ar, rede, etc.), a
+    // solicitação continua um rascunho válido e o próximo ciclo do robô a
+    // pega normalmente. Não vale a pena falhar a criação por causa disso.
+    console.error('Falha ao disparar o robô de RPA (rascunho segue pendente):', erro);
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -43,7 +76,13 @@ export async function POST(request: Request) {
     // direta à API.
     const concessionaire = await prisma.concessionaire.findUnique({
       where: { id: concessionaireId },
-      select: { name: true, situacao: true, ativoParaCadastro: true },
+      select: {
+        name: true,
+        situacao: true,
+        ativoParaCadastro: true,
+        tipoCanal: true,
+        canalIsentos: true,
+      },
     });
 
     if (!concessionaire) {
@@ -91,7 +130,37 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json(registration, { status: 201 });
+    // A solicitação não deve ficar esperando uma ação manual pra sair do
+    // rascunho -- envia (ou acorda o robô) na hora, conforme o canal da
+    // concessionária, em vez de depender de um clique depois ou do próximo
+    // ciclo de 5 min do robô.
+    let envioMotivo: string | null = null;
+
+    if (concessionaire.tipoCanal === 'EMAIL') {
+      try {
+        const resultado = await processRegistration(registration.id);
+        if (resultado.status !== 'enviado' && 'motivo' in resultado) {
+          envioMotivo = resultado.motivo;
+        }
+      } catch (erro) {
+        // Não falha a criação por causa disso: a solicitação já existe como
+        // rascunho válido e pode ser reenviada pelo botão depois.
+        console.error('Falha ao enviar automaticamente após a criação:', erro);
+        envioMotivo = erro instanceof Error ? erro.message : 'Falha ao enviar';
+      }
+    } else if (portalDoCanal(concessionaire.canalIsentos)?.automatizado) {
+      await dispararRpaAgora();
+    }
+
+    const registrationAtualizada = await prisma.concesssionaireRegistration.findUnique({
+      where: { id: registration.id },
+      include: {
+        vehicle: { select: { plate: true } },
+        concessionaire: { select: { name: true } },
+      },
+    });
+
+    return NextResponse.json({ ...registrationAtualizada, envioMotivo }, { status: 201 });
   } catch (error) {
     console.error('Erro ao criar solicitação:', error);
     return NextResponse.json(
