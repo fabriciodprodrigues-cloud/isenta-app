@@ -18,6 +18,10 @@ const update_account_schema = z.object({
   state: z.string().length(2).optional(),
   status: z.enum(['active', 'inactive', 'pending']).optional(),
   razaoSocial: z.string().optional(),
+  cep: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().optional(),
 });
 
 export async function GET(

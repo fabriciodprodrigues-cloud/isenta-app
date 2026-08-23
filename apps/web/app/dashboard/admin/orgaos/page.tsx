@@ -26,6 +26,10 @@ interface Account {
   responsibleEmail: string;
   responsiblePhone: string;
   address: string;
+  cep: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
 }
 
 const emptyForm = {
@@ -38,6 +42,10 @@ const emptyForm = {
   address: '',
   city: '',
   state: '',
+  cep: '',
+  numero: '',
+  complemento: '',
+  bairro: '',
 };
 
 export default function GestaoOrgaos() {
@@ -80,6 +88,10 @@ export default function GestaoOrgaos() {
       address: orgao.address ?? '',
       city: orgao.city ?? '',
       state: orgao.state ?? '',
+      cep: orgao.cep ?? '',
+      numero: orgao.numero ?? '',
+      complemento: orgao.complemento ?? '',
+      bairro: orgao.bairro ?? '',
     });
     setModalAberto('editar');
   }
@@ -282,6 +294,10 @@ export default function GestaoOrgaos() {
               <Input value={formData.responsibleEmail} onChange={(e) => setFormData({ ...formData, responsibleEmail: e.target.value })} placeholder="E-mail" />
               <Input value={formData.responsiblePhone} onChange={(e) => setFormData({ ...formData, responsiblePhone: e.target.value })} placeholder="Telefone" />
               <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} placeholder="Endereço" />
+              <Input value={formData.numero} onChange={(e) => setFormData({ ...formData, numero: e.target.value })} placeholder="Número" />
+              <Input value={formData.complemento} onChange={(e) => setFormData({ ...formData, complemento: e.target.value })} placeholder="Complemento" />
+              <Input value={formData.bairro} onChange={(e) => setFormData({ ...formData, bairro: e.target.value })} placeholder="Bairro" />
+              <Input value={formData.cep} onChange={(e) => setFormData({ ...formData, cep: e.target.value })} placeholder="CEP" />
               <Input value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} placeholder="Cidade" />
               <Select value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} options={ESTADOS_BR.map((estado) => ({ value: estado.uf, label: estado.nome }))} />
             </div>
