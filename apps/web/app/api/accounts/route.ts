@@ -20,6 +20,10 @@ const create_account_schema = z.object({
   address: z.string().min(5),
   city: z.string().min(2),
   state: z.string().length(2),
+  cep: z.string().optional(),
+  numero: z.string().optional(),
+  complemento: z.string().optional(),
+  bairro: z.string().optional(),
 });
 
 export async function GET(request: NextRequest) {

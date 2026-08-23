@@ -18,6 +18,10 @@ export default function NovoOrgao() {
     responsibleEmail: '',
     responsiblePhone: '',
     address: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cep: '',
     city: '',
     state: 'SP',
   });
@@ -134,6 +138,50 @@ export default function NovoOrgao() {
                   placeholder="ex: Avenida Paulista, 1000"
                   className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-paper mb-1">Número</label>
+                <input
+                  type="text"
+                  value={formData.numero}
+                  onChange={e => setFormData({ ...formData, numero: e.target.value })}
+                  placeholder="ex: 1000"
+                  className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-paper mb-1">Complemento</label>
+                <input
+                  type="text"
+                  value={formData.complemento}
+                  onChange={e => setFormData({ ...formData, complemento: e.target.value })}
+                  placeholder="ex: Sala 10"
+                  className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-paper mb-1">Bairro</label>
+                <input
+                  type="text"
+                  value={formData.bairro}
+                  onChange={e => setFormData({ ...formData, bairro: e.target.value })}
+                  placeholder="ex: Centro"
+                  className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-paper mb-1">CEP</label>
+                <input
+                  type="text"
+                  value={formData.cep}
+                  onChange={e => setFormData({ ...formData, cep: e.target.value })}
+                  placeholder="ex: 01310-100"
+                  className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
                 />
               </div>
             </div>
