@@ -45,6 +45,8 @@ export async function GET(request: Request) {
             website: true,
             cidade: true,
             estados: true,
+            tipoCanal: true,
+            canalIsentos: true,
           },
         },
       },

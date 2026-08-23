@@ -61,6 +61,14 @@ export function portalDoCanal(canalIsentos: string | null): DefinicaoPortal | nu
   for (const portal of Object.values(PORTAIS)) {
     const dominio = portal.url.replace(/^https?:\/\//, '').toLowerCase();
     if (endereco.includes(dominio)) return portal;
+
+    // O canal cadastrado no banco usa o domínio novo (motivapagamentos.com.br)
+    // mesmo com portal.url fixo no domínio antigo por causa do OAuth (ver
+    // apps/rpa-worker/src/motiva.js) -- sem esse fallback, todo canal da
+    // Motiva caía como "portal desconhecido" aqui, apesar do robô operá-lo.
+    if (dominio.includes('ccrpagamentos.com.br') && endereco.includes('isentos.motivapagamentos.com.br')) {
+      return portal;
+    }
   }
 
   return null;

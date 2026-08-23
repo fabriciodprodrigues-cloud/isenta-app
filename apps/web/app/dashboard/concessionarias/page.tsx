@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { RequestExemptionModal } from '@/components/RequestExemptionModal';
 import { format_estados, format_date } from '@/lib/utils';
+import { portalDoCanal } from '@/lib/portais';
 import {
   Table,
   TableHead,
@@ -34,6 +35,8 @@ interface Registration {
     // Ambos sao opcionais no schema.
     cidade: string | null;
     estados: string | null;
+    tipoCanal: string | null;
+    canalIsentos: string | null;
   };
   vehicle: {
     plate: string;
@@ -115,14 +118,14 @@ export default function ConcessionariasPage() {
       });
 
       if (response.ok) {
-        // Recarregar dados
-        if (session?.user?.accountId) {
-          const res = await fetch(`/api/registrations?accountId=${session.user.accountId}`);
-          const data = await res.json();
-          setRegistrations(data);
-        }
+        await recarregarRegistrations();
       } else {
-        alert('Erro ao enviar solicitação');
+        // A API já devolve o motivo real (documento faltando, identidade do
+        // órgão incompleta, SMTP não configurado etc.) -- mostrar sempre o
+        // mesmo texto genérico escondia isso e não dava pra saber o que
+        // corrigir.
+        const erro = await response.json().catch(() => null);
+        alert(erro?.error || 'Erro ao enviar solicitação');
       }
     } catch (error) {
       console.error('Erro:', error);
@@ -270,7 +273,7 @@ export default function ConcessionariasPage() {
                           : '—'}
                       </TableCell>
                       <TableCell>
-                        {reg.status === 'rascunho' && (
+                        {reg.status === 'rascunho' && reg.concessionaire.tipoCanal === 'EMAIL' && (
                           <Button
                             variant="secondary"
                             size="sm"
@@ -280,6 +283,29 @@ export default function ConcessionariasPage() {
                           >
                             {sendingId === reg.id ? 'Enviando...' : 'Enviar'}
                           </Button>
+                        )}
+                        {/*
+                          Concessionária de portal/robô: não há e-mail pra mandar. O
+                          botão "Enviar" daqui só serve pro canal EMAIL; oferecê-lo
+                          aqui sempre falhava com "canal PORTAL exige tratativa manual",
+                          confuso pro operador mesmo quando um portal automatizado (a
+                          Motiva, hoje) ia processar sozinho em alguns minutos. Só a
+                          Motiva tem robô -- os demais portais realmente exigem
+                          tratativa manual, então o rótulo muda conforme o caso.
+                        */}
+                        {reg.status === 'rascunho' && reg.concessionaire.tipoCanal !== 'EMAIL' && (
+                          <span
+                            className="text-paper-dim text-xs"
+                            title={
+                              portalDoCanal(reg.concessionaire.canalIsentos)?.automatizado
+                                ? 'Processado automaticamente pelo robô em alguns minutos'
+                                : 'Este portal ainda não é automatizado -- solicite direto no site da concessionária'
+                            }
+                          >
+                            {portalDoCanal(reg.concessionaire.canalIsentos)?.automatizado
+                              ? 'Aguardando robô'
+                              : 'Manual'}
+                          </span>
                         )}
                         {(reg.status === 'enviado' || reg.status === 'aguardando_resposta') && (
                           <Button
