@@ -58,7 +58,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { serialNumber, vehicleId, expiresAt } = body;
+    const { serialNumber, vehicleId, expiresAt, operadora } = body;
 
     if (!serialNumber) {
       return NextResponse.json(
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
         status: vehicleId ? 'assigned' : 'available',
         expiresAt: expiresAt ? new Date(expiresAt) : null,
         assignedAt: vehicleId ? new Date() : null,
+        operadora: operadora || null,
       },
       include: {
         vehicle: { select: { plate: true } },
@@ -111,19 +112,27 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const { tagId, vehicleId } = body;
+    const { tagId, vehicleId, operadora } = body;
 
     if (!tagId) {
       return NextResponse.json({ error: 'Missing tagId' }, { status: 400 });
     }
 
+    const data: Record<string, unknown> = {};
+    // vehicleId undefined = não mexe no vínculo (chamada só de "editar
+    // operadora"); vehicleId === '' ou null = desvincula de propósito.
+    if (vehicleId !== undefined) {
+      data.vehicleId = vehicleId || null;
+      data.status = vehicleId ? 'assigned' : 'available';
+      data.assignedAt = vehicleId ? new Date() : null;
+    }
+    if (operadora !== undefined) {
+      data.operadora = operadora || null;
+    }
+
     const tag = await prisma.tag.update({
       where: { id: tagId },
-      data: {
-        vehicleId: vehicleId || null,
-        status: vehicleId ? 'assigned' : 'available',
-        assignedAt: vehicleId ? new Date() : null,
-      },
+      data,
       include: {
         vehicle: { select: { plate: true } },
       },

@@ -15,8 +15,6 @@ export const dynamic = 'force-dynamic';
 // vez de sequencial é o que mantém isso dentro do limite de 60s do Hobby.
 export const maxDuration = 60;
 
-const OPERADORA_OSA = 'ConectCar';
-
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -35,7 +33,11 @@ export async function POST(
     where: { id: params.id },
     include: {
       account: true,
-      veiculos: { include: { vehicle: true } },
+      veiculos: {
+        include: {
+          vehicle: { include: { tags: { select: { serialNumber: true, operadora: true }, take: 1 } } },
+        },
+      },
     },
   });
 
@@ -92,7 +94,6 @@ export async function POST(
     responsavelFrotaNome: cadastro.responsavelFrotaNome ?? orgao.responsibleName,
     responsavelFrotaTelefone: cadastro.responsavelFrotaTelefone ?? orgao.responsiblePhone,
     responsavelFrotaEmail: cadastro.responsavelFrotaEmail ?? orgao.responsibleEmail,
-    operadoraOsa: OPERADORA_OSA,
     veiculos: cadastro.veiculos.map(av => ({
       plate: av.vehicle.plate,
       renavam: av.vehicle.renavam,
@@ -105,6 +106,8 @@ export async function POST(
       anoModelo: av.vehicle.anoModelo,
       registroPatrimonial: av.registroPatrimonial,
       prefixo: av.prefixo,
+      tag: av.vehicle.tags[0]?.serialNumber ?? null,
+      operadoraTag: av.vehicle.tags[0]?.operadora ?? null,
     })),
     dataEmissao: new Date(),
   };

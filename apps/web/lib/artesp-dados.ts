@@ -57,6 +57,15 @@ export interface VeiculoArtesp {
   anoModelo: number | null;
   registroPatrimonial: string | null;
   prefixo: string | null;
+  /** Número de série da TAG vinculada (Tag.vehicleId) — null se não houver. */
+  tag: string | null;
+  /**
+   * Marca/operadora que emitiu essa TAG (Tag.operadora) — null se não
+   * informada. Cada veículo pode ter uma operadora diferente (nem toda TAG
+   * cadastrada é ConectCar), então isso é por veículo, não um valor único
+   * pro cadastro inteiro.
+   */
+  operadoraTag: string | null;
 }
 
 export interface DadosArtesp {
@@ -66,7 +75,6 @@ export interface DadosArtesp {
   responsavelFrotaNome: string;
   responsavelFrotaTelefone: string;
   responsavelFrotaEmail: string;
-  operadoraOsa: string; // ConectCar, hoje a única OSA parceira da Isenta
   veiculos: VeiculoArtesp[];
   dataEmissao: Date;
 }

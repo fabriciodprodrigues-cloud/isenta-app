@@ -21,7 +21,13 @@ interface Tag {
   vehicleId: string | null;
   vehicle?: { plate: string } | null;
   expiresAt: string | null;
+  operadora: string | null;
 }
+
+// A ConectCar é a única confirmada como OSA autorizada pela ARTESP até
+// agora (ver módulo ARTESP) -- "Outra" fica disponível pra não travar o
+// cadastro em TAGs de operadoras ainda não confirmadas.
+const OPERADORAS_TAG = ['ConectCar', 'Sem Parar', 'Veloe', 'Move Mais', 'Outra'];
 
 interface Vehicle {
   id: string;
@@ -38,6 +44,7 @@ export default function GestaoTags() {
     serialNumber: '',
     vehicleId: '',
     expiresAt: '',
+    operadora: '',
   });
 
   useEffect(() => {
@@ -80,7 +87,7 @@ export default function GestaoTags() {
 
       if (response.ok) {
         await loadData();
-        setFormData({ serialNumber: '', vehicleId: '', expiresAt: '' });
+        setFormData({ serialNumber: '', vehicleId: '', expiresAt: '', operadora: '' });
         setShowForm(false);
       } else {
         alert('Erro ao criar TAG');
@@ -88,6 +95,25 @@ export default function GestaoTags() {
     } catch (error) {
       console.error('Erro:', error);
       alert('Erro ao criar TAG');
+    }
+  }
+
+  async function handleEditarOperadora(tagId: string, operadora: string) {
+    try {
+      const response = await fetch('/api/tags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagId, operadora }),
+      });
+
+      if (response.ok) {
+        await loadData();
+      } else {
+        alert('Erro ao definir a operadora');
+      }
+    } catch (error) {
+      console.error('Erro:', error);
+      alert('Erro ao definir a operadora');
     }
   }
 
@@ -147,6 +173,22 @@ export default function GestaoTags() {
                   className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm text-paper mb-1">Operadora (OSA)</label>
+                <select
+                  value={formData.operadora}
+                  onChange={e => setFormData({ ...formData, operadora: e.target.value })}
+                  className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                >
+                  <option value="">Não informada</option>
+                  {OPERADORAS_TAG.map(op => (
+                    <option key={op} value={op}>
+                      {op}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -220,6 +262,7 @@ export default function GestaoTags() {
               <TableHead>
                 <TableRow>
                   <TableCell>Serial</TableCell>
+                  <TableCell>Operadora</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Veículo</TableCell>
                   <TableCell>Validade</TableCell>
@@ -231,6 +274,20 @@ export default function GestaoTags() {
                   <TableRow key={tag.id}>
                     <TableCell className="font-mono font-semibold text-accent">
                       {tag.serialNumber}
+                    </TableCell>
+                    <TableCell>
+                      <select
+                        value={tag.operadora ?? ''}
+                        onChange={e => handleEditarOperadora(tag.id, e.target.value)}
+                        className="text-xs px-2 py-1 bg-ink-700 border border-white/10 rounded text-paper"
+                      >
+                        <option value="">Não informada</option>
+                        {OPERADORAS_TAG.map(op => (
+                          <option key={op} value={op}>
+                            {op}
+                          </option>
+                        ))}
+                      </select>
                     </TableCell>
                     <TableCell>
                       <Badge variant={tag.status === 'available' ? 'success' : 'info'}>

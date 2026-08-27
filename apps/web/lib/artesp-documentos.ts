@@ -32,6 +32,7 @@ import {
   anosArtesp,
   type DadosArtesp,
   type TipoDocumentoArtesp,
+  type VeiculoArtesp,
 } from './artesp-dados';
 
 function cabecalhoOrgao(dados: DadosArtesp): string {
@@ -53,11 +54,17 @@ function assinaturaResponsavel(dados: DadosArtesp): string {
   );
 }
 
+/** "07519786249 (Sem Parar)" -- combina serial e operadora numa só coluna pra caber na página. */
+function tagComOperadora(v: VeiculoArtesp): string {
+  if (!v.tag) return '—';
+  return v.operadoraTag ? `${v.tag} (${v.operadoraTag})` : v.tag;
+}
+
 function tabelaFrota(dados: DadosArtesp): string {
-  const cabecalho = ['Placa', 'Prefixo', 'Reg. patrimonial', 'Marca/Modelo', 'Cor', 'Ano fab./mod.'];
+  const cabecalho = ['Placa', 'Prefixo', 'Reg. patrimonial', 'Marca/Modelo', 'Cor', 'Ano fab./mod.', 'TAG (operadora)'];
   // Placa em 1200 DXA quebrava "SMF-6F91" no meio, confirmado numa geração
-  // real -- 1500 dá folga pra placa de 7-8 caracteres sem quebrar.
-  const larguras = [1500, 1100, 1500, 2200, 1100, 1500];
+  // real -- 1400 dá folga pra placa de 7-8 caracteres sem quebrar.
+  const larguras = [1400, 1000, 1300, 2000, 1000, 1300, 1700];
   const linhas = dados.veiculos.map(v => [
     v.plate,
     v.prefixo ?? '—',
@@ -65,6 +72,7 @@ function tabelaFrota(dados: DadosArtesp): string {
     nomeVeiculoArtesp(v),
     v.cor ?? '—',
     anosArtesp(v),
+    tagComOperadora(v),
   ]);
   return tabelaSimples(cabecalho, larguras, linhas) + paragrafoVazio();
 }
@@ -131,8 +139,8 @@ function montarCorpoDeclaracaoTagWordXml(dados: DadosArtesp): string {
         `A ${razao}, CNPJ nº ${dados.orgao.cnpj}, declara, para os fins do art. 4º da Portaria ` +
           `ARTESP nº 56/2025, que os dispositivos eletrônicos de identificação veicular (TAG) ` +
           `relacionados a seguir foram corretamente instalados nos respectivos veículos oficiais ` +
-          `da frota, adquiridos junto à operadora de sistema automático (OSA) autorizada pela ` +
-          `ARTESP ${dados.operadoraOsa}.`
+          `da frota, adquiridos junto à(s) operadora(s) de sistema automático (OSA) autorizada(s) ` +
+          `pela ARTESP indicada(s) na tabela abaixo.`
       ),
       JUSTIFICADO + ESPACO_DEPOIS(240)
     ) +
@@ -148,13 +156,13 @@ function montarCorpoAnexoVeiculosWordXml(dados: DadosArtesp): string {
   return (
     cabecalhoOrgao(dados) +
     p(run('ANEXO AO TERMO DE ADESÃO', RUN_NEGRITO)) +
-    p(run('Relação de veículos ativos junto à operadora de sistema automático (OSA)'), ESPACO_DEPOIS(240)) +
+    p(run('Relação de veículos ativos junto à(s) operadora(s) de sistema automático (OSA)'), ESPACO_DEPOIS(240)) +
     p(
       run(
         `Órgão: ${razao} — CNPJ ${dados.orgao.cnpj}`
-      )
+      ),
+      ESPACO_DEPOIS(240)
     ) +
-    p(run(`Operadora (OSA): ${dados.operadoraOsa}`), ESPACO_DEPOIS(240)) +
     tabelaFrota(dados)
   );
 }
@@ -193,8 +201,8 @@ function montarCorpoSolicitacaoCobrancaWordXml(dados: DadosArtesp): string {
     p(
       run(
         `A ${razao}, CNPJ nº ${dados.orgao.cnpj}, solicita o processamento eletrônico automático ` +
-          `das passagens da frota oficial relacionada nos anexos, via TAG vinculada à operadora ` +
-          `${dados.operadoraOsa}, nos termos da Portaria ARTESP nº 56/2025.`
+          `das passagens da frota oficial relacionada nos anexos, via TAG vinculada à(s) ` +
+          `operadora(s) indicada(s) no anexo de veículos, nos termos da Portaria ARTESP nº 56/2025.`
       ),
       JUSTIFICADO + ESPACO_DEPOIS(240)
     ) +

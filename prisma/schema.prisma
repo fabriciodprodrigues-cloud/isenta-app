@@ -369,6 +369,13 @@ model Tag {
 
   // Sem vinculo com concessionaria: a TAG e aceita em todas elas.
 
+  // Marca/operadora que emitiu a TAG (ex.: ConectCar, Sem Parar, Veloe).
+  // Importa pro modulo ARTESP: a Portaria 56/2025 exige que a TAG seja de
+  // uma OSA autorizada pela ARTESP -- so a ConectCar esta confirmada como
+  // tal ate agora, entao o operador precisa saber qual e a marca de cada
+  // veiculo antes de protocolar.
+  operadora         String?
+
   status            String   @default("available") // available | assigned | expired | inactive
   assignedAt        DateTime?
   expiresAt         DateTime?

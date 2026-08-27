@@ -37,7 +37,7 @@ async function main() {
 
   const orgao = await prisma.account.findFirst({
     where: { name: { contains: busca } },
-    include: { vehicles: { take: 1 } },
+    include: { vehicles: { include: { tags: { select: { serialNumber: true, operadora: true }, take: 1 } }, take: 1 } },
   });
 
   if (!orgao) throw new Error(`nenhum órgão encontrado contendo "${busca}"`);
@@ -72,7 +72,6 @@ async function main() {
     responsavelFrotaNome: orgao.responsibleName,
     responsavelFrotaTelefone: orgao.responsiblePhone,
     responsavelFrotaEmail: orgao.responsibleEmail,
-    operadoraOsa: 'ConectCar',
     veiculos: [
       {
         plate: veiculo.plate,
@@ -86,6 +85,8 @@ async function main() {
         anoModelo: veiculo.anoModelo,
         registroPatrimonial: 'PAT-0001',
         prefixo: 'PREF-01',
+        tag: veiculo.tags[0]?.serialNumber ?? null,
+        operadoraTag: veiculo.tags[0]?.operadora ?? null,
       },
     ],
     dataEmissao: new Date(),
