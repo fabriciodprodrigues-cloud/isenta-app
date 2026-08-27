@@ -29,3 +29,6 @@ scripts-tmp-*.js
 
 # Backup de dados de producao: contem dado real de orgao publico
 backup-isenta-*.json
+
+.vercel
+.env*
