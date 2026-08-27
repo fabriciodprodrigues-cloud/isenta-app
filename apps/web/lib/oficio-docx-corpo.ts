@@ -10,44 +10,16 @@ import {
   type VeiculoDoOficio,
   type DadosDoOficio,
 } from './oficio-dados';
+import { p, run, RUN_NEGRITO, JUSTIFICADO, ESPACO_DEPOIS, paragrafoVazio } from './word-xml';
 
 /**
  * Corpo do ofício em WordprocessingML, para enxertar no modelo .docx do
  * órgão (ver oficio-docx.ts) e gerar o PDF anexado ao e-mail.
  *
  * Mesma estrutura de conteúdo que montarOficio() já produz em HTML — só o
- * formato de saída muda. Deliberadamente sem referenciar nenhum w:style por
- * id: só formatação inline (negrito, tamanho, cor, bordas de tabela), para
- * funcionar em qualquer modelo de órgão, independente do que exista ou não
- * no styles.xml dele.
+ * formato de saída muda. Os helpers de baixo nível (p/run/escXml etc.)
+ * ficam em word-xml.ts, compartilhados com os documentos da ARTESP.
  */
-
-/** Escapa o que vai para dentro do XML — os dados vêm do cadastro do usuário. */
-function escXml(valor: string | number | null | undefined): string {
-  if (valor === null || valor === undefined) return '';
-  return String(valor)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-}
-
-function p(conteudo: string, propsPar = ''): string {
-  return `<w:p><w:pPr>${propsPar}</w:pPr>${conteudo}</w:p>`;
-}
-
-function run(texto: string, propsRun = ''): string {
-  return `<w:r><w:rPr>${propsRun}</w:rPr><w:t xml:space="preserve">${escXml(texto)}</w:t></w:r>`;
-}
-
-const RUN_NEGRITO = '<w:b/>';
-const JUSTIFICADO = '<w:jc w:val="both"/>';
-const ESPACO_DEPOIS = (dxa: number) => `<w:spacing w:after="${dxa}"/>`;
-
-function paragrafoVazio(): string {
-  return '<w:p/>';
-}
 
 function tabelaVeiculos(lista: VeiculoDoOficio[], titulo: string, prazo: number): string {
   const cabecalho = ['Placa', 'RENAVAM', 'Marca/Modelo', 'Cor', 'Ano fab./mod.', 'Categoria', 'TAG'];

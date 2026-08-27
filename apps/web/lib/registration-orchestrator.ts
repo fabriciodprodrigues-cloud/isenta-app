@@ -80,7 +80,7 @@ async function carregarTimbre(pathname: string): Promise<string | null> {
  * Carrega o modelo de ofício (.docx) do órgão, como buffer bruto — sem
  * conversão nenhuma, quem usa (montarOficioDocx) é quem sabe manipular XML.
  */
-async function carregarModeloOficio(pathname: string): Promise<Buffer | null> {
+export async function carregarModeloOficio(pathname: string): Promise<Buffer | null> {
   try {
     const resultado = await get(pathname, { access: 'private' });
 

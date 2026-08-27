@@ -23,8 +23,13 @@ export class ModeloOficioInvalidoError extends Error {
   }
 }
 
-export async function montarOficioDocx(
-  dados: DadosDoOficio,
+/**
+ * Enxerta um corpo WordML já pronto no modelo .docx do órgão. Genérico: não
+ * sabe nem precisa saber que documento é — quem monta o corpo (ofício,
+ * requerimento ARTESP etc.) decide o conteúdo.
+ */
+export async function montarDocumentoDocx(
+  corpoWordXml: string,
   modeloBuffer: Buffer
 ): Promise<Buffer> {
   const zip = await JSZip.loadAsync(modeloBuffer);
@@ -49,12 +54,10 @@ export async function montarOficioDocx(
   const indiceSectPr = miolo.lastIndexOf('<w:sectPr');
   const sectPrFinal = indiceSectPr !== -1 ? miolo.slice(indiceSectPr) : '';
 
-  const corpoNovo = montarCorpoOficioWordXml(dados);
-
   const xmlFinal =
     xmlOriginal.slice(0, inicioBody) +
     '<w:body>' +
-    corpoNovo +
+    corpoWordXml +
     sectPrFinal +
     '</w:body>' +
     xmlOriginal.slice(fimBody + '</w:body>'.length);
@@ -63,4 +66,12 @@ export async function montarOficioDocx(
 
   const resultado = await zip.generateAsync({ type: 'nodebuffer' });
   return resultado;
+}
+
+/** Atalho para o ofício de isenção — mantido para não mexer nos chamadores existentes. */
+export async function montarOficioDocx(
+  dados: DadosDoOficio,
+  modeloBuffer: Buffer
+): Promise<Buffer> {
+  return montarDocumentoDocx(montarCorpoOficioWordXml(dados), modeloBuffer);
 }

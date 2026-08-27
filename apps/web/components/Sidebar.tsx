@@ -92,6 +92,18 @@ export function Sidebar() {
             </div>
           </Link>
 
+          <Link href="/dashboard/artesp">
+            <div
+              className={`rounded-lg px-4 py-2 transition-colors ${
+                isActive('/dashboard/artesp')
+                  ? 'bg-ink-700 text-green'
+                  : 'text-slate hover:text-paper hover:bg-ink-700/50'
+              }`}
+            >
+              ARTESP
+            </div>
+          </Link>
+
         </nav>
       </aside>
     );
@@ -182,6 +194,18 @@ export function Sidebar() {
             }`}
           >
             Concessionárias
+          </div>
+        </Link>
+
+        <Link href="/dashboard/admin/artesp">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors ${
+              isActive('/dashboard/admin/artesp')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            ARTESP
           </div>
         </Link>
 

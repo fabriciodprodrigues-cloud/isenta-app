@@ -98,6 +98,7 @@ model Account {
   autorizacao  TermoAutorizacao?
   portais      PortalCredencial[]
   respostasRecebidas EmailRespostaRecebida[]
+  artespCadastros    ArtespCadastro[]
 
   @@index([cnpj])
   @@index([status])
@@ -232,6 +233,7 @@ model Vehicle {
   alerts        Alert[]
   documents     Document[]
   tags          Tag[]
+  artespVeiculos ArtespVeiculo[]
 
   @@unique([accountId, plate])
   @@index([accountId])
@@ -394,4 +396,70 @@ model Document {
   @@index([vehicleId])
   @@index([type])
   @@index([uploadedAt])
+}
+
+// --- Módulo ARTESP (Portaria ARTESP nº 56/2025) ---
+//
+// Diferente de ConcesssionaireRegistration (uma linha por veículo x
+// concessionária), a ARTESP tem cadastro único por órgão cobrindo a frota
+// inteira -- por isso um modelo próprio em vez de reaproveitar aquele.
+
+model ArtespCadastro {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  tipoEntidade String  // A (estadual SP/SIGEF) | B (municipio/outro estado)
+  abrangencia  String? // texto conforme tipoEntidade -- ver Portaria Art. 2º, §1º/§2º
+
+  responsavelFrotaNome     String?
+  responsavelFrotaTelefone String?
+  responsavelFrotaEmail    String?
+
+  status         String    @default("rascunho") // rascunho | documentos_gerados | protocolado | deferido | indeferido | exigencia
+  protocolo      String?
+  protocoladoEm  DateTime?
+  protocoladoPor String?
+  decisaoEm      DateTime?
+  decisaoObs     String?
+
+  veiculos   ArtespVeiculo[]
+  documentos ArtespDocumento[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([status])
+}
+
+model ArtespVeiculo {
+  id               String         @id @default(cuid())
+  artespCadastroId String
+  artespCadastro   ArtespCadastro @relation(fields: [artespCadastroId], references: [id], onDelete: Cascade)
+  vehicleId        String
+  vehicle          Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  // Específicos da ARTESP (Art. 6º) -- não pertencem ao Vehicle em geral.
+  registroPatrimonial String?
+  prefixo             String?
+
+  @@unique([artespCadastroId, vehicleId])
+  @@index([vehicleId])
+}
+
+model ArtespDocumento {
+  id               String         @id @default(cuid())
+  artespCadastroId String
+  artespCadastro   ArtespCadastro @relation(fields: [artespCadastroId], references: [id], onDelete: Cascade)
+
+  tipo        String    // requerimento | declaracao_tag | anexo_veiculos | declaracao_concordancia | solicitacao_cobranca
+  status      String    @default("gerado") // gerado | assinado
+  urlGerado   String?
+  urlAssinado String?
+  geradoEm    DateTime?
+  assinadoEm  DateTime?
+
+  @@unique([artespCadastroId, tipo])
+  @@index([artespCadastroId])
 }
