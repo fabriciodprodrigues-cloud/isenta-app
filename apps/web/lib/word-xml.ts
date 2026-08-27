@@ -41,7 +41,12 @@ export function tabelaSimples(
   larguras: number[],
   linhas: string[][]
 ): string {
-  const linhaCabecalho = `<w:tr>${cabecalho
+  // tblHeader repete o cabeçalho se a tabela quebrar em outra página;
+  // cantSplit impede uma linha de ser cortada ao meio entre páginas — sem
+  // isso, uma placa como "SMF-6F91" podia aparecer "SMF-6F" numa página e
+  // "91" solto na seguinte, junto com pedaços de outras colunas da mesma
+  // linha. Confirmado numa geração real.
+  const linhaCabecalho = `<w:tr><w:trPr><w:tblHeader/><w:cantSplit/></w:trPr>${cabecalho
     .map(
       (texto, i) =>
         `<w:tc><w:tcPr><w:tcW w:w="${larguras[i]}" w:type="dxa"/><w:shd w:val="clear" w:fill="E8F0E8"/></w:tcPr>${p(
@@ -53,7 +58,7 @@ export function tabelaSimples(
   const linhasDados = linhas
     .map(
       linha =>
-        `<w:tr>${linha
+        `<w:tr><w:trPr><w:cantSplit/></w:trPr>${linha
           .map(
             (texto, i) =>
               `<w:tc><w:tcPr><w:tcW w:w="${larguras[i]}" w:type="dxa"/></w:tcPr>${p(run(texto))}</w:tc>`

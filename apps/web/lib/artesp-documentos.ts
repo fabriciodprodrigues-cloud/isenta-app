@@ -55,7 +55,9 @@ function assinaturaResponsavel(dados: DadosArtesp): string {
 
 function tabelaFrota(dados: DadosArtesp): string {
   const cabecalho = ['Placa', 'Prefixo', 'Reg. patrimonial', 'Marca/Modelo', 'Cor', 'Ano fab./mod.'];
-  const larguras = [1200, 1200, 1600, 2400, 1200, 1500];
+  // Placa em 1200 DXA quebrava "SMF-6F91" no meio, confirmado numa geração
+  // real -- 1500 dá folga pra placa de 7-8 caracteres sem quebrar.
+  const larguras = [1500, 1100, 1500, 2200, 1100, 1500];
   const linhas = dados.veiculos.map(v => [
     v.plate,
     v.prefixo ?? '—',
