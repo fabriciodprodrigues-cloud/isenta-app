@@ -430,6 +430,11 @@ model ArtespCadastro {
   decisaoEm      DateTime?
   decisaoObs     String?
 
+  // Preenchido pelo disparo único (POST .../enviar) -- endereço usado no
+  // envio do dossiê à ARTESP, não necessariamente o mesmo de um eventual
+  // protocolo manual feito depois.
+  emailArtespEnviadoPara String?
+
   veiculos   ArtespVeiculo[]
   documentos ArtespDocumento[]
 

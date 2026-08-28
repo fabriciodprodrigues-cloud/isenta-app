@@ -317,3 +317,80 @@ export async function enviarOficioDeIsencao({
   return { anexosEnviados: attachments.length, remetenteUsado: remetente.user };
 }
 
+/**
+ * Envia um e-mail com anexos pela caixa institucional do órgão, sem o
+ * gerador de HTML do ofício (assunto/texto/html já vêm prontos de quem
+ * chama). Mesmo relay e mesma regra de "nada sai em nome da Isenta" de
+ * enviarOficioDeIsencao -- usado pelo disparo único do dossiê ARTESP
+ * (destino fixo, não uma concessionária).
+ */
+export async function enviarEmailComAnexos({
+  destino,
+  remetente,
+  remetenteNome,
+  replyTo,
+  assunto,
+  texto,
+  html,
+  anexos,
+}: {
+  destino: string;
+  remetente: CredencialSmtp;
+  remetenteNome: string;
+  replyTo?: string | null;
+  assunto: string;
+  texto: string;
+  html: string;
+  anexos: AnexoDocumento[];
+}) {
+  const relayUrl = process.env.EMAIL_RELAY_URL;
+  const relaySecret = process.env.EMAIL_RELAY_SECRET;
+  if (!relayUrl || !relaySecret) {
+    throw new RelayDeEmailNaoConfiguradoError();
+  }
+
+  const attachments = await baixarAnexos(anexos);
+
+  let resposta: Response;
+  try {
+    resposta = await fetch(`${relayUrl}/send-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-secret': relaySecret,
+      },
+      body: JSON.stringify({
+        host: remetente.host,
+        port: remetente.port,
+        secure: remetente.secure,
+        user: remetente.user,
+        password: remetente.pass,
+        from: `"${remetenteNome}" <${remetente.user}>`,
+        to: destino,
+        replyTo: replyTo || undefined,
+        subject: assunto,
+        text: texto,
+        html,
+        attachments: attachments.map(a => ({
+          filename: a.filename,
+          content: a.content.toString('base64'),
+        })),
+      }),
+      signal: AbortSignal.timeout(45_000),
+    });
+  } catch (erro) {
+    throw new RelayDeEmailFalhouError(
+      erro instanceof Error ? erro.message : String(erro)
+    );
+  }
+
+  if (!resposta.ok) {
+    const corpo = await resposta.json().catch(() => null);
+    throw new RelayDeEmailFalhouError(
+      corpo?.detalhe || corpo?.erro || `HTTP ${resposta.status}`
+    );
+  }
+
+  return { anexosEnviados: attachments.length };
+}
+

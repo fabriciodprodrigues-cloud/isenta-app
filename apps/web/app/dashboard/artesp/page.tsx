@@ -35,6 +35,7 @@ interface Cadastro {
   status: string;
   protocolo: string | null;
   protocoladoEm: string | null;
+  emailArtespEnviadoPara: string | null;
   veiculos: ArtespVeiculoRow[];
   documentos: ArtespDocumentoRow[];
 }
@@ -254,6 +255,30 @@ export default function ArtespPage() {
     }
   }
 
+  async function enviarParaArtesp() {
+    if (!cadastro) return;
+    if (!confirm('Enviar o dossiê e a documentação da frota num único e-mail para a ARTESP agora?')) return;
+    setErro('');
+    setSalvando(true);
+    try {
+      const resposta = await fetch(`/api/artesp/cadastro/${cadastro.id}/enviar`, { method: 'POST' });
+      const corpo = await resposta.json().catch(() => null);
+      if (!resposta.ok) {
+        setErro(
+          corpo?.pendencias
+            ? `Cadastro incompleto: ${corpo.pendencias.map((p: any) => p.descricao).join('; ')}`
+            : corpo?.error || 'Erro ao enviar para a ARTESP'
+        );
+        return;
+      }
+      await carregar();
+    } catch {
+      setErro('Falha de conexão.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   async function protocolar() {
     if (!cadastro) return;
     setErro('');
@@ -361,10 +386,16 @@ export default function ArtespPage() {
                   {STATUS_BADGE[cadastro.status]?.label ?? cadastro.status}
                 </Badge>
               </div>
-              {cadastro.protocolo && (
+              {(cadastro.protocolo || cadastro.emailArtespEnviadoPara) && (
                 <div className="text-right">
-                  <p className="text-paper-dim text-sm">Protocolo</p>
-                  <p className="text-paper font-mono">{cadastro.protocolo}</p>
+                  {cadastro.protocolo ? (
+                    <>
+                      <p className="text-paper-dim text-sm">Protocolo</p>
+                      <p className="text-paper font-mono">{cadastro.protocolo}</p>
+                    </>
+                  ) : (
+                    <p className="text-paper-dim text-sm">Enviado para {cadastro.emailArtespEnviadoPara}</p>
+                  )}
                   {cadastro.protocoladoEm && (
                     <p className="text-paper-dim text-xs">{format_date(new Date(cadastro.protocoladoEm))}</p>
                   )}
@@ -520,39 +551,96 @@ export default function ArtespPage() {
             cadastro.status !== 'indeferido' && (
               <Card>
                 <CardHeader>
-                  <h2 className="font-semibold text-paper">Protocolo</h2>
+                  <h2 className="font-semibold text-paper">Envio à ARTESP</h2>
                 </CardHeader>
                 <CardBody className="space-y-3">
                   <p className="text-xs text-paper-dim">
                     Fica liberado só quando todos os 5 documentos estiverem assinados — a Portaria
                     não prevê estorno por cadastro incompleto.
                   </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-paper mb-1">Número do protocolo</label>
-                      <input
-                        value={protocoloInput}
-                        onChange={e => setProtocoloInput(e.target.value)}
-                        className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-paper mb-1">Data</label>
-                      <input
-                        type="date"
-                        value={dataProtocoloInput}
-                        onChange={e => setDataProtocoloInput(e.target.value)}
-                        max={new Date().toISOString().slice(0, 10)}
-                        className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
-                      />
-                    </div>
-                  </div>
-                  <Button onClick={protocolar} disabled={salvando || !protocoloInput}>
-                    {salvando ? 'Salvando...' : 'Marcar como protocolado'}
+                  <Button
+                    onClick={enviarParaArtesp}
+                    disabled={
+                      salvando ||
+                      cadastro.documentos.length !== ORDEM_DOCUMENTOS.length ||
+                      cadastro.documentos.some(d => d.status !== 'assinado')
+                    }
+                  >
+                    {salvando ? 'Enviando...' : 'Enviar dossiê e documentação da frota à ARTESP'}
                   </Button>
+                  <p className="text-xs text-paper-dim">
+                    Envia num único e-mail o dossiê assinado (ou os 5 documentos assinados) mais o
+                    CRLV e contrato de locação de cada veículo, diretamente para o protocolo da
+                    ARTESP. Ao enviar, o cadastro já é marcado como protocolado.
+                  </p>
+                  <details className="text-xs text-paper-dim">
+                    <summary className="cursor-pointer hover:text-paper">
+                      Já tenho um número de protocolo (protocolei por outro canal)
+                    </summary>
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div>
+                        <label className="block text-sm text-paper mb-1">Número do protocolo</label>
+                        <input
+                          value={protocoloInput}
+                          onChange={e => setProtocoloInput(e.target.value)}
+                          className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-paper mb-1">Data</label>
+                        <input
+                          type="date"
+                          value={dataProtocoloInput}
+                          onChange={e => setDataProtocoloInput(e.target.value)}
+                          max={new Date().toISOString().slice(0, 10)}
+                          className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={protocolar} disabled={salvando || !protocoloInput} className="mt-3">
+                      {salvando ? 'Salvando...' : 'Marcar como protocolado'}
+                    </Button>
+                  </details>
                 </CardBody>
               </Card>
             )}
+
+          {cadastro.status === 'protocolado' && !cadastro.protocolo && (
+            <Card>
+              <CardHeader>
+                <h2 className="font-semibold text-paper">Número de protocolo</h2>
+              </CardHeader>
+              <CardBody className="space-y-3">
+                <p className="text-xs text-paper-dim">
+                  Já enviado à ARTESP. Quando eles responderem com o número oficial do protocolo,
+                  registre aqui.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-paper mb-1">Número do protocolo</label>
+                    <input
+                      value={protocoloInput}
+                      onChange={e => setProtocoloInput(e.target.value)}
+                      className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-paper mb-1">Data</label>
+                    <input
+                      type="date"
+                      value={dataProtocoloInput}
+                      onChange={e => setDataProtocoloInput(e.target.value)}
+                      max={new Date().toISOString().slice(0, 10)}
+                      className="w-full px-3 py-2 bg-ink-700 border border-white/10 rounded text-paper"
+                    />
+                  </div>
+                </div>
+                <Button onClick={protocolar} disabled={salvando || !protocoloInput}>
+                  {salvando ? 'Salvando...' : 'Registrar número de protocolo'}
+                </Button>
+              </CardBody>
+            </Card>
+          )}
         </>
       )}
     </div>
