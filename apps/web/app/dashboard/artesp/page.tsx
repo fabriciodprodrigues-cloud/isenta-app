@@ -207,6 +207,30 @@ export default function ArtespPage() {
     }
   }
 
+  async function enviarDossieAssinado(arquivo: File) {
+    if (!cadastro) return;
+    setErro('');
+    setSalvando(true);
+    try {
+      const form = new FormData();
+      form.append('file', arquivo);
+      const resposta = await fetch(`/api/artesp/cadastro/${cadastro.id}/upload-dossie-assinado`, {
+        method: 'POST',
+        body: form,
+      });
+      const corpo = await resposta.json().catch(() => null);
+      if (!resposta.ok) {
+        setErro(corpo?.error || 'Erro ao enviar o dossiê assinado');
+        return;
+      }
+      await carregar();
+    } catch {
+      setErro('Falha de conexão.');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   async function enviarAssinado(documentoId: string, arquivo: File) {
     setErro('');
     setSalvando(true);
@@ -419,6 +443,20 @@ export default function ArtespPage() {
                     <Button variant="secondary">Gerar dossiê único (PDF)</Button>
                   </a>
                 )}
+                {cadastro.documentos.length === ORDEM_DOCUMENTOS.length && (
+                  <label className="rounded-lg font-medium transition-all bg-ink-700 text-paper hover:bg-ink-600 px-4 py-2 text-base cursor-pointer inline-flex items-center">
+                    Enviar dossiê assinado (um arquivo p/ todos)
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={e => {
+                        const arquivo = e.target.files?.[0];
+                        if (arquivo) enviarDossieAssinado(arquivo);
+                      }}
+                    />
+                  </label>
+                )}
               </div>
               {cadastro.documentos.length > 0 && (
                 <div className="space-y-2 mt-4">
@@ -468,7 +506,9 @@ export default function ArtespPage() {
                     >
                       assinador.iti.br
                     </a>{' '}
-                    (gov.br/ICP-Brasil) e envie a via assinada de volta aqui.
+                    (gov.br/ICP-Brasil) e envie a via assinada de volta aqui — um por um, ou baixe o
+                    dossiê único acima, assine-o uma vez só e envie pelo botão &quot;Enviar dossiê
+                    assinado&quot;.
                   </p>
                 </div>
               )}
