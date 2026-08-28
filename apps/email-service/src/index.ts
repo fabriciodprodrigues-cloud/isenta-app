@@ -3,11 +3,20 @@ import type { NextFunction, Request, Response } from 'express';
 import { createTransport } from 'nodemailer';
 import { ImapFlow } from 'imapflow';
 import dotenv from 'dotenv';
+import { createRequire } from 'module';
 import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
+
+// nodemailer não exporta MailComposer no entrypoint principal, só no
+// caminho interno lib/mail-composer -- sem tipos publicados que o
+// resolver NodeNext (ESM) reconheça nesse subcaminho. require() dinâmico
+// contorna a resolução estática do TS; é a única forma de montar o mesmo
+// MIME que foi enviado, pra gravar a cópia em Enviados.
+const require = createRequire(import.meta.url);
+const MailComposer = require('nodemailer/lib/mail-composer');
 
 dotenv.config();
 
@@ -92,6 +101,77 @@ interface CorpoEnvio {
   text?: string;
   html?: string;
   attachments?: AnexoEnvio[];
+  /** Opcional -- se vier, tenta gravar uma cópia da mensagem na pasta de
+   *  Enviados/Sent depois do envio (ver copiarParaEnviados). Sem isso, o
+   *  envio funciona normalmente, só sem a cópia. */
+  imapHost?: string;
+  imapPort?: number;
+  imapSecure?: boolean;
+}
+
+/**
+ * Envio por SMTP puro (não pelo webmail) não deixa cópia em Enviados por
+ * conta própria -- nenhum provedor observado até agora faz isso sozinho.
+ * Melhor esforço, best-effort: conecta por IMAP, acha a pasta certa (via
+ * flag especial \Sent, com nomes comuns como plano B) e grava a mesma
+ * mensagem lá. Nunca lança: se falhar, o e-mail já foi enviado de
+ * verdade via SMTP, e uma cópia perdida em Enviados não deveria derrubar
+ * a resposta de sucesso pra quem chamou.
+ */
+async function copiarParaEnviados(params: {
+  imapHost: string;
+  imapPort?: number;
+  imapSecure?: boolean;
+  user: string;
+  password: string;
+  raw: Buffer;
+}): Promise<boolean> {
+  const client = new ImapFlow({
+    host: params.imapHost,
+    port: Number(params.imapPort) || 993,
+    secure: params.imapSecure === undefined ? true : Boolean(params.imapSecure),
+    auth: { user: params.user, pass: params.password },
+    logger: false,
+  });
+  client.on('error', erro => console.error('Erro de conexão IMAP (cópia p/ Enviados):', erro));
+
+  try {
+    await client.connect();
+
+    const pastas = await client.list();
+    const pastaEspecial = pastas.find(p => p.specialUse === '\\Sent');
+    const candidatos = [
+      pastaEspecial?.path,
+      'Sent',
+      'Enviados',
+      'INBOX.Sent',
+      'INBOX/Sent',
+      'Sent Items',
+      '[Gmail]/Sent Mail',
+    ].filter((p): p is string => Boolean(p));
+
+    for (const caminho of candidatos) {
+      try {
+        await client.append(caminho, params.raw, ['\\Seen']);
+        await client.logout();
+        return true;
+      } catch {
+        // Nome não existe nessa caixa -- tenta o próximo candidato.
+      }
+    }
+
+    console.error('Nenhuma pasta de Enviados encontrada pra gravar cópia.');
+    await client.logout();
+    return false;
+  } catch (erro) {
+    console.error('Falha ao gravar cópia em Enviados:', erro);
+    try {
+      await client.logout();
+    } catch {
+      // conexão já pode ter caído
+    }
+    return false;
+  }
 }
 
 app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, res: Response) => {
@@ -108,6 +188,9 @@ app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, 
     text,
     html,
     attachments,
+    imapHost,
+    imapPort,
+    imapSecure,
   } = req.body ?? {};
 
   if (!host || !user || !password || !to || !subject) {
@@ -123,6 +206,16 @@ app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, 
     .filter((a): a is Required<AnexoEnvio> => Boolean(a.filename && a.content))
     .map(a => ({ filename: a.filename, content: Buffer.from(a.content, 'base64') }));
 
+  const opcoesEnvio = {
+    from: from || user,
+    to,
+    replyTo,
+    subject,
+    text,
+    html,
+    attachments: anexosValidos.length > 0 ? anexosValidos : undefined,
+  };
+
   try {
     const transportador = createTransport({
       host,
@@ -131,21 +224,31 @@ app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, 
       auth: { user, pass: password },
     });
 
-    const info = await transportador.sendMail({
-      from: from || user,
-      to,
-      replyTo,
-      subject,
-      text,
-      html,
-      attachments: anexosValidos.length > 0 ? anexosValidos : undefined,
-    });
+    const info = await transportador.sendMail(opcoesEnvio);
 
     res.status(200).json({
       mensagem: 'E-mail enviado',
       messageId: info.messageId,
       anexosEnviados: anexosValidos.length,
     });
+
+    // Depois de responder: o e-mail já saiu de verdade via SMTP, então a
+    // cópia em Enviados não pode acrescentar latência (nem risco de
+    // timeout) ao caminho crítico do envio -- roda em segundo plano, só
+    // loga o resultado.
+    if (imapHost) {
+      new Promise<Buffer>((resolve, reject) => {
+        new MailComposer(opcoesEnvio).compile().build((erro: Error | null, mensagem: Buffer) => {
+          if (erro) reject(erro);
+          else resolve(mensagem);
+        });
+      })
+        .then(raw => copiarParaEnviados({ imapHost, imapPort, imapSecure, user, password, raw }))
+        .then(ok => {
+          if (!ok) console.error(`Cópia em Enviados não gravada para ${user} (mensagem já enviada via SMTP).`);
+        })
+        .catch(erro => console.error('Falha ao montar/gravar cópia em Enviados:', erro));
+    }
   } catch (erro) {
     // Erro de SMTP (autenticação, IP bloqueado, etc.) não é bug nosso — é
     // resposta do servidor remoto. 502 (bad gateway) sinaliza isso melhor

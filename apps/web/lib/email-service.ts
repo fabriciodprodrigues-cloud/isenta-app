@@ -278,6 +278,12 @@ export async function enviarOficioDeIsencao({
         secure: remetente.secure,
         user: remetente.user,
         password: remetente.pass,
+        // Se o órgão já tem IMAP configurado (mesma credencial usada pra
+        // ler as respostas), o relay tenta gravar uma cópia em Enviados
+        // depois do envio -- best-effort, não bloqueia nem falha o envio.
+        imapHost: remetente.imapHost,
+        imapPort: remetente.imapPort,
+        imapSecure: remetente.imapSeguro,
         // O remetente é a própria caixa autenticada. Divergir daqui costuma
         // ser rejeitado pelo servidor ou marcado como falsificação.
         from: `"${razao}" <${remetente.user}>`,
@@ -370,6 +376,9 @@ export async function enviarEmailComAnexos({
         secure: remetente.secure,
         user: remetente.user,
         password: remetente.pass,
+        imapHost: remetente.imapHost,
+        imapPort: remetente.imapPort,
+        imapSecure: remetente.imapSeguro,
         from: `"${remetenteNome}" <${remetente.user}>`,
         to: destino,
         replyTo: replyTo || undefined,
