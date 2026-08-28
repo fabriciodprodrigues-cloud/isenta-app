@@ -140,27 +140,37 @@ export default function AdminArtesp() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {c.status === 'protocolado' && (
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={processandoId === c.id}
-                              onClick={() => registrarDecisao(c.id, 'deferido')}
+                        <div className="flex gap-2 items-center">
+                          {c.status === 'protocolado' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={processandoId === c.id}
+                                onClick={() => registrarDecisao(c.id, 'deferido')}
+                              >
+                                Deferido
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                disabled={processandoId === c.id}
+                                onClick={() => registrarDecisao(c.id, 'indeferido')}
+                              >
+                                Indeferido
+                              </Button>
+                            </>
+                          )}
+                          {c.status !== 'protocolado' && <span className="text-paper-dim text-xs">—</span>}
+                          {c.documentos.length === 5 && (
+                            <a
+                              href={`/api/artesp/cadastro/${c.id}/dossie`}
+                              className="text-xs text-accent hover:underline"
                             >
-                              Deferido
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              disabled={processandoId === c.id}
-                              onClick={() => registrarDecisao(c.id, 'indeferido')}
-                            >
-                              Indeferido
-                            </Button>
-                          </div>
-                        )}
-                        {c.status !== 'protocolado' && <span className="text-paper-dim text-xs">—</span>}
+                              Dossiê
+                            </a>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

@@ -410,9 +410,16 @@ export default function ArtespPage() {
               <h2 className="font-semibold text-paper">Documentos</h2>
             </CardHeader>
             <CardBody className="space-y-3">
-              <Button onClick={gerarDocumentos} disabled={salvando || cadastro.veiculos.length === 0}>
-                {salvando ? 'Gerando...' : 'Gerar documentos'}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={gerarDocumentos} disabled={salvando || cadastro.veiculos.length === 0}>
+                  {salvando ? 'Gerando...' : 'Gerar documentos'}
+                </Button>
+                {cadastro.documentos.length === ORDEM_DOCUMENTOS.length && (
+                  <a href={`/api/artesp/cadastro/${cadastro.id}/dossie`}>
+                    <Button variant="secondary">Gerar dossiê único (PDF)</Button>
+                  </a>
+                )}
+              </div>
               {cadastro.documentos.length > 0 && (
                 <div className="space-y-2 mt-4">
                   {ORDEM_DOCUMENTOS.map(tipo => {
