@@ -44,36 +44,41 @@ interface SendExemptionRequestEmailProps {
  * nosso sistema.
  */
 async function baixarAnexos(anexos: AnexoDocumento[]) {
-  const baixados = [];
-
-  for (const anexo of anexos) {
-    // Já vem pronto em memória (ex: o PDF do ofício) — nada a baixar.
-    if ('content' in anexo) {
-      baixados.push({ filename: anexo.fileName, content: anexo.content });
-      continue;
-    }
-
-    try {
-      // A store e privada: um fetch direto na url retorna 401. So o SDK
-      // autentica a leitura.
-      const resultado = await get(anexo.url, { access: 'private' });
-
-      if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
-        console.error(`Anexo indisponível no Blob: ${anexo.fileName}`);
-        continue;
+  // Em paralelo: com vários veículos (CRLV + contrato de cada um, ver o
+  // disparo ARTESP) o download sequencial de N arquivos do Blob comia
+  // boa parte do orçamento de 45s reservado pra chamada do relay em si,
+  // e chegou a estourar (timeout real observado em produção com 4
+  // veículos). Cada download é independente, então paralelizar é seguro.
+  const resultados = await Promise.all(
+    anexos.map(async anexo => {
+      // Já vem pronto em memória (ex: o PDF do ofício) — nada a baixar.
+      if ('content' in anexo) {
+        return { filename: anexo.fileName, content: anexo.content };
       }
 
-      const buffer = Buffer.from(
-        await new Response(resultado.stream).arrayBuffer()
-      );
+      try {
+        // A store e privada: um fetch direto na url retorna 401. So o SDK
+        // autentica a leitura.
+        const resultado = await get(anexo.url, { access: 'private' });
 
-      baixados.push({ filename: anexo.fileName, content: buffer });
-    } catch (erro) {
-      console.error(`Falha ao baixar anexo ${anexo.fileName}:`, erro);
-    }
-  }
+        if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+          console.error(`Anexo indisponível no Blob: ${anexo.fileName}`);
+          return null;
+        }
 
-  return baixados;
+        const buffer = Buffer.from(
+          await new Response(resultado.stream).arrayBuffer()
+        );
+
+        return { filename: anexo.fileName, content: buffer };
+      } catch (erro) {
+        console.error(`Falha ao baixar anexo ${anexo.fileName}:`, erro);
+        return null;
+      }
+    })
+  );
+
+  return resultados.filter((r): r is { filename: string; content: Buffer } => r !== null);
 }
 
 export class EmailNaoConfiguradoError extends Error {
@@ -376,7 +381,13 @@ export async function enviarEmailComAnexos({
           content: a.content.toString('base64'),
         })),
       }),
-      signal: AbortSignal.timeout(45_000),
+      // O dossiê ARTESP carrega bem mais anexos que o ofício comum (CRLV +
+      // contrato de cada veículo da frota, não só 1-2 documentos) -- os
+      // 45s usados em enviarOficioDeIsencao já estouraram em produção com
+      // 4 veículos. A rota que chama isto usa maxDuration=60; deixa a
+      // maior fatia possível pro relay, já que baixarAnexos agora roda em
+      // paralelo e sobra pouco tempo fixo antes disso.
+      signal: AbortSignal.timeout(55_000),
     });
   } catch (erro) {
     throw new RelayDeEmailFalhouError(
