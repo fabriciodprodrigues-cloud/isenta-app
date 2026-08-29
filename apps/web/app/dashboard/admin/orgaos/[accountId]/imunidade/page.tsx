@@ -63,6 +63,19 @@ const STATUS_ITEM: Record<string, { label: string; variant: 'default' | 'success
   CANCELADA: { label: 'Cancelada', variant: 'default' },
 };
 
+// Rótulos pra concessionariasPendentes/concessionariasComProblema, que
+// misturam status de item do lote com status lido direto das
+// ConcesssionaireRegistration (inclusive as que o operador mandou pelo
+// botão manual, sem nenhum lote) -- ver lib/imunidade.ts.
+const STATUS_PENDENTE_LABEL: Record<string, string> = {
+  nunca_disparado: 'ainda não disparada',
+  rascunho_nao_enviado: 'rascunho criado, ainda não enviado',
+  enviado_aguardando_confirmacao: 'já enviada (inclusive manualmente pelo operador) — aguardando confirmação',
+  PENDENTE_PRE_REQUISITO: 'pendência no órgão (documento ou identidade)',
+  NA_FILA: 'na fila pra enviar',
+  ENVIADA: 'enviada — aguardando confirmação',
+};
+
 export default function ImunidadeNacionalAdmin() {
   const params = useParams();
   const accountId = params.accountId as string;
@@ -228,7 +241,7 @@ export default function ImunidadeNacionalAdmin() {
             {resumo.concessionariasPendentes.map(c => (
               <div key={c.id} className="text-sm text-paper-dim">
                 <span className="text-paper">{c.nome}</span>
-                <span> — {c.status === 'nunca_disparado' ? 'ainda não disparada' : c.status}</span>
+                <span> — {STATUS_PENDENTE_LABEL[c.status] ?? c.status}</span>
               </div>
             ))}
           </CardBody>

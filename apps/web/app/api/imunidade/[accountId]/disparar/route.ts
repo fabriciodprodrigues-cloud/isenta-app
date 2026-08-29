@@ -8,6 +8,15 @@ export const dynamic = 'force-dynamic';
 // request -- mesmo motivo do maxDuration=60 de process-pending/route.ts.
 export const maxDuration = 60;
 
+// Status que significam "já tem um pedido em curso ou resolvido nessa
+// concessionária" -- inclui o que o operador manda pelo botão manual
+// (RequestExemptionModal), não só o que o disparo nacional já enviou. O
+// disparo nacional lê esse status de verdade antes de criar item novo,
+// pra nunca duplicar um pedido que o operador (ou um disparo anterior) já
+// fez -- só 'rascunho' (nunca enviado) e 'recusado' (precisa de pedido
+// novo) deixam a concessionária elegível pra um novo disparo.
+const JA_EM_CURSO_OU_RESOLVIDO = new Set(['enviado', 'aguardando_resposta', 'aprovado']);
+
 /**
  * Dispara a isenção nacional: cria um SolicitacaoIsencaoLote com um item
  * por concessionária ativa de canal EMAIL que ainda não está 100% coberta
@@ -82,12 +91,16 @@ export async function POST(
   let itensJaCobertos = 0;
 
   for (const concessionaria of concessionariasEmail) {
-    const jaCoberto = veiculoIds.every(
-      vid =>
-        registrationsExistentes.find(r => r.vehicleId === vid && r.concessionaireId === concessionaria.id)
-          ?.status === 'aprovado'
-    );
-    if (jaCoberto) {
+    // Toda a frota já tem pedido em curso ou resolvido nessa concessionária
+    // -- inclusive o que o operador mandou pelo botão manual, sem passar
+    // por nenhum lote. Pula: disparar de novo duplicaria o pedido.
+    const jaEmCurso = veiculoIds.every(vid => {
+      const status = registrationsExistentes.find(
+        r => r.vehicleId === vid && r.concessionaireId === concessionaria.id
+      )?.status;
+      return status ? JA_EM_CURSO_OU_RESOLVIDO.has(status) : false;
+    });
+    if (jaEmCurso) {
       itensJaCobertos++;
       continue;
     }

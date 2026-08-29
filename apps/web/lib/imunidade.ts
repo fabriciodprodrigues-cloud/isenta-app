@@ -65,6 +65,23 @@ interface ItemRecenteLeve {
   createdAt: Date;
 }
 
+/**
+ * Rótulo do que está acontecendo com essa concessionária pra esse órgão,
+ * priorizando o status real das ConcesssionaireRegistration (que reflete
+ * inclusive o botão manual do operador, sem passar por nenhum lote) sobre
+ * o status do item do disparo nacional -- é assim que o admin master vê
+ * "o operador já mandou isso manualmente" mesmo sem ter disparado nada
+ * pela Imunidade Nacional.
+ */
+function statusDescritivo(statusPorVeiculo: (string | null)[], item?: ItemRecenteLeve): string {
+  if (statusPorVeiculo.some(s => s === 'enviado' || s === 'aguardando_resposta')) {
+    return 'enviado_aguardando_confirmacao';
+  }
+  if (item) return item.status;
+  if (statusPorVeiculo.some(s => s === 'rascunho')) return 'rascunho_nao_enviado';
+  return 'nunca_disparado';
+}
+
 function computar(
   veiculoIds: string[],
   concessionariasEmail: { id: string; name: string }[],
@@ -131,7 +148,7 @@ function computar(
     concessionariasPendentes.push({
       id: c.id,
       nome: c.name,
-      status: item?.status ?? 'nunca_disparado',
+      status: statusDescritivo(statusPorVeiculo, item),
       motivo: item?.ultimoErro ?? null,
     });
   }
