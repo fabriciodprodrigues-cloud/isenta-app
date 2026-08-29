@@ -5,10 +5,20 @@
  *
  * Escopo do MVP: só concessionárias ativas com tipoCanal='EMAIL' entram no
  * cálculo (ver plano -- disparo nacional cobre EMAIL_OFICIO por enquanto,
- * PORTAL_RPA/ARTESP ficam de fora por decisão explícita da especificação).
- * As demais ativas contam à parte, como "sem suporte automatizado ainda"
- * -- informativo, nunca como pendência do órgão (não são pedidas por
- * ninguém ainda, então não é honesto tratá-las como risco dele).
+ * PORTAL_RPA fica de fora por decisão explícita da especificação). As
+ * demais ativas contam à parte, como "sem suporte automatizado ainda" --
+ * informativo, nunca como pendência do órgão (não são pedidas por ninguém
+ * ainda, então não é honesto tratá-las como risco dele).
+ *
+ * Exclusão à parte: concessionárias com regulador='ARTESP' NUNCA entram
+ * aqui, nem como EMAIL nem como "sem canal" -- a ARTESP centraliza num
+ * único e-mail (protocolo@artesp.sp.gov.br) o pedido de isenção pra TODAS
+ * as concessionárias sob sua responsabilidade de uma vez só (confirmado:
+ * 19 das 22 concessionárias reguladas por ela compartilham esse mesmo
+ * endereço). Se o disparo nacional as tratasse como itens EMAIL comuns,
+ * mandaria um e-mail redundante por concessionária pra ARTESP -- exatamente
+ * o problema que o módulo ARTESP dedicado (ver artesp-*.ts) já resolve com
+ * um dossiê único. A cobertura delas é rastreada só por lá, não aqui.
  *
  * A verdade de cobertura vem sempre do status atual de
  * ConcesssionaireRegistration (reaproveitado, não duplicado) -- o
@@ -17,6 +27,9 @@
  */
 
 import { prisma } from './prisma';
+
+/** Nunca entram no universo do disparo nacional -- ver comentário acima. */
+const FORA_DO_ESCOPO_NACIONAL = { regulador: { not: 'ARTESP' } } as const;
 
 export type StatusImunidade = 'IMUNE' | 'PARCIAL' | 'COM_RISCO';
 
@@ -143,11 +156,11 @@ export async function calcularImunidade(accountId: string): Promise<ImunidadeRes
   const [veiculos, concessionariasEmail, concessionariasSemCanal, itensDaConta] = await Promise.all([
     prisma.vehicle.findMany({ where: { accountId }, select: { id: true } }),
     prisma.concessionaire.findMany({
-      where: { situacao: 'ATIVO', ativoParaCadastro: true, tipoCanal: 'EMAIL' },
+      where: { situacao: 'ATIVO', ativoParaCadastro: true, tipoCanal: 'EMAIL', ...FORA_DO_ESCOPO_NACIONAL },
       select: { id: true, name: true },
     }),
     prisma.concessionaire.count({
-      where: { situacao: 'ATIVO', ativoParaCadastro: true, OR: [{ tipoCanal: { not: 'EMAIL' } }, { tipoCanal: null }] },
+      where: { situacao: 'ATIVO', ativoParaCadastro: true, ...FORA_DO_ESCOPO_NACIONAL, OR: [{ tipoCanal: { not: 'EMAIL' } }, { tipoCanal: null }] },
     }),
     prisma.solicitacaoIsencaoItem.findMany({
       where: { lote: { accountId } },
@@ -183,11 +196,11 @@ export async function calcularImunidadeEmLote(
       select: { id: true, accountId: true },
     }),
     prisma.concessionaire.findMany({
-      where: { situacao: 'ATIVO', ativoParaCadastro: true, tipoCanal: 'EMAIL' },
+      where: { situacao: 'ATIVO', ativoParaCadastro: true, tipoCanal: 'EMAIL', ...FORA_DO_ESCOPO_NACIONAL },
       select: { id: true, name: true },
     }),
     prisma.concessionaire.count({
-      where: { situacao: 'ATIVO', ativoParaCadastro: true, OR: [{ tipoCanal: { not: 'EMAIL' } }, { tipoCanal: null }] },
+      where: { situacao: 'ATIVO', ativoParaCadastro: true, ...FORA_DO_ESCOPO_NACIONAL, OR: [{ tipoCanal: { not: 'EMAIL' } }, { tipoCanal: null }] },
     }),
     prisma.solicitacaoIsencaoItem.findMany({
       where: { lote: { accountId: { in: accountIds } } },

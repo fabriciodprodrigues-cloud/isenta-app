@@ -15,6 +15,13 @@ export const maxDuration = 60;
  * faltarem (reaproveita processRegistration pra enviar -- nada de SMTP/docx
  * novo aqui), e processa o quanto couber no orçamento desta mesma
  * requisição. Admin-only -- o órgão nunca dispara (ver conceito seção 2).
+ *
+ * Exclui concessionárias com regulador='ARTESP': a ARTESP centraliza o
+ * pedido de todas as concessionárias sob sua responsabilidade num único
+ * e-mail (protocolo@artesp.sp.gov.br) -- tratá-las como itens EMAIL comuns
+ * mandaria um e-mail redundante por concessionária pra ela. Essas usam o
+ * módulo ARTESP dedicado (ver artesp-*.ts), não este disparo. Mesma
+ * exclusão de lib/imunidade.ts, que faz o cálculo de cobertura.
  */
 export async function POST(
   request: NextRequest,
@@ -38,7 +45,7 @@ export async function POST(
   const [veiculos, concessionariasEmail] = await Promise.all([
     prisma.vehicle.findMany({ where: { accountId }, select: { id: true } }),
     prisma.concessionaire.findMany({
-      where: { situacao: 'ATIVO', ativoParaCadastro: true, tipoCanal: 'EMAIL' },
+      where: { situacao: 'ATIVO', ativoParaCadastro: true, tipoCanal: 'EMAIL', regulador: { not: 'ARTESP' } },
       select: { id: true },
     }),
   ]);
