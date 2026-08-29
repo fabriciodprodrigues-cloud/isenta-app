@@ -451,7 +451,7 @@ export function LandingPage() {
             </div>
           </div>
           <div className="flex flex-wrap justify-between gap-3 border-t border-white/[0.06] pt-6 text-xs text-slate">
-            <span>© 2026 Isenta · Agência Infinity Serviços de Eventos e Publicidades Ltda</span>
+            <span>© 2026 Isenta Soluções em Tecnologia Ltda</span>
             <span>Gestão de isenção de pedágio para frotas públicas</span>
           </div>
         </div>
