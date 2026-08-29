@@ -104,6 +104,18 @@ export function Sidebar() {
             </div>
           </Link>
 
+          <Link href="/dashboard/imunidade-nacional">
+            <div
+              className={`rounded-lg px-4 py-2 transition-colors ${
+                isActive('/dashboard/imunidade-nacional')
+                  ? 'bg-ink-700 text-green'
+                  : 'text-slate hover:text-paper hover:bg-ink-700/50'
+              }`}
+            >
+              Imunidade Nacional
+            </div>
+          </Link>
+
         </nav>
       </aside>
     );
@@ -218,6 +230,18 @@ export function Sidebar() {
             }`}
           >
             Cadastros
+          </div>
+        </Link>
+
+        <Link href="/dashboard/admin/orgaos">
+          <div
+            className={`rounded-lg px-4 py-2 transition-colors ${
+              isActive('/dashboard/admin/orgaos')
+                ? 'bg-ink-700 text-green'
+                : 'text-slate hover:text-paper hover:bg-ink-700/50'
+            }`}
+          >
+            Imunidade Nacional
           </div>
         </Link>
       </nav>

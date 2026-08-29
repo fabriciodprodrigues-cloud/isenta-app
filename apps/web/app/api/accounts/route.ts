@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 import { validate_cnpj } from '@/lib/utils';
+import { calcularImunidadeEmLote } from '@/lib/imunidade';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,8 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    const imunidadePorConta = await calcularImunidadeEmLote(accounts.map((a: any) => a.id));
+
     const accountsWithStats = accounts.map((account: any) => {
       // Cadastros pendem de Vehicle, nao de Account: a conta so os alcanca
       // atravessando seus veiculos.
@@ -92,6 +95,7 @@ export async function GET(request: NextRequest) {
         cadastrosAtivos,
         cadastrosPendentes,
         saude,
+        imunidade: imunidadePorConta.get(account.id)?.status ?? 'PARCIAL',
       };
     });
 

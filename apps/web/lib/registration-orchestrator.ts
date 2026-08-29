@@ -473,3 +473,186 @@ export async function processPendingRegistrations(
 
   return resumo;
 }
+
+// --- Imunidade Nacional: processamento dos itens de um lote ---
+//
+// A cobertura de verdade é sempre lida do status atual de
+// ConcesssionaireRegistration (reaproveitado, ver processRegistration
+// acima) -- estas funções só mantêm o SolicitacaoIsencaoItem sincronizado
+// com isso, nunca decidem cobertura por conta própria.
+
+/** Está coberto (todo veículo da frota atual aprovado nessa concessionária)? Algum recusado? */
+async function statusDoPar(
+  accountId: string,
+  concessionariaId: string
+): Promise<{ completo: boolean; algumRecusado: boolean }> {
+  const veiculos = await prisma.vehicle.findMany({ where: { accountId }, select: { id: true } });
+  if (veiculos.length === 0) return { completo: false, algumRecusado: false };
+
+  const registrations = await prisma.concesssionaireRegistration.findMany({
+    where: { vehicleId: { in: veiculos.map(v => v.id) }, concessionaireId: concessionariaId },
+    select: { vehicleId: true, status: true },
+  });
+
+  const completo = veiculos.every(
+    v => registrations.find(r => r.vehicleId === v.id)?.status === 'aprovado'
+  );
+  const algumRecusado = registrations.some(r => r.status === 'recusado');
+
+  return { completo, algumRecusado };
+}
+
+async function sincronizarStatusDoLote(loteId: string): Promise<void> {
+  const itens = await prisma.solicitacaoIsencaoItem.findMany({
+    where: { loteId },
+    select: { status: true },
+  });
+  if (itens.length === 0) return;
+
+  const TERMINAIS = ['CONFIRMADA', 'COM_PROBLEMA', 'CANCELADA'];
+  const todosTerminais = itens.every(i => TERMINAIS.includes(i.status));
+  if (!todosTerminais) return;
+
+  const status = itens.every(i => i.status === 'CONFIRMADA') ? 'CONCLUIDO_TOTAL' : 'CONCLUIDO_PARCIAL';
+  await prisma.solicitacaoIsencaoLote.update({ where: { id: loteId }, data: { status } });
+}
+
+/**
+ * Reavalia um item a partir do status atual das ConcesssionaireRegistration
+ * da frota. Chamado depois de um envio bem-sucedido perder o rastro (ex.:
+ * já não sobrava linha "rascunho" pra reenviar) e, principalmente, depois
+ * de confirmarResposta() aprovar/recusar por leitura de e-mail revisada.
+ */
+export async function sincronizarItemDoLote(itemId: string): Promise<void> {
+  const item = await prisma.solicitacaoIsencaoItem.findUnique({
+    where: { id: itemId },
+    select: { id: true, concessionariaId: true, lote: { select: { id: true, accountId: true } } },
+  });
+  if (!item) return;
+
+  const { completo, algumRecusado } = await statusDoPar(item.lote.accountId, item.concessionariaId);
+
+  if (completo) {
+    await prisma.solicitacaoIsencaoItem.update({
+      where: { id: item.id },
+      data: { status: 'CONFIRMADA', dataConfirmacao: new Date() },
+    });
+  } else if (algumRecusado) {
+    await prisma.solicitacaoIsencaoItem.update({
+      where: { id: item.id },
+      data: { status: 'COM_PROBLEMA', ultimoErro: 'Recusado pela concessionária' },
+    });
+  }
+
+  await sincronizarStatusDoLote(item.lote.id);
+}
+
+export interface ResumoProcessamentoLote {
+  processados: number;
+  enviados: number;
+  pendentes: number;
+  comProblema: number;
+  loteStatus: string;
+}
+
+/**
+ * Varredura dos itens de um lote de imunidade nacional -- mesmo padrão de
+ * processPendingRegistrations (sequencial, dentro do maxDuration=60 da
+ * rota que chama), só que escopado a um lote e mapeando o resultado pro
+ * status do SolicitacaoIsencaoItem em vez de só contar.
+ *
+ * Não distingue PENDENTE_PRE_REQUISITO de NA_FILA como dois passos
+ * separados: processRegistration já faz a própria checagem de
+ * pré-requisito no momento do envio, então tentar de novo é o próprio
+ * jeito de saber se o pré-requisito foi satisfeito -- uma checagem prévia
+ * duplicaria essa lógica.
+ */
+export async function processarItensDoLote(
+  loteId: string,
+  limite = 30
+): Promise<ResumoProcessamentoLote> {
+  const itens = await prisma.solicitacaoIsencaoItem.findMany({
+    where: { loteId, status: { in: ['PENDENTE_PRE_REQUISITO', 'NA_FILA'] } },
+    take: limite,
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, concessionariaId: true, lote: { select: { accountId: true } } },
+  });
+
+  const resumo: ResumoProcessamentoLote = {
+    processados: 0,
+    enviados: 0,
+    pendentes: 0,
+    comProblema: 0,
+    loteStatus: '',
+  };
+
+  for (const item of itens) {
+    resumo.processados++;
+
+    const candidata = await prisma.concesssionaireRegistration.findFirst({
+      where: {
+        status: 'rascunho',
+        concessionaireId: item.concessionariaId,
+        vehicle: { accountId: item.lote.accountId },
+      },
+      select: { id: true },
+    });
+
+    if (!candidata) {
+      await sincronizarItemDoLote(item.id);
+      resumo.pendentes++;
+      continue;
+    }
+
+    try {
+      const resultado = await processRegistration(candidata.id);
+
+      if (resultado.status === 'enviado') {
+        const enviado = await prisma.concesssionaireRegistration.findFirst({
+          where: {
+            concessionaireId: item.concessionariaId,
+            vehicle: { accountId: item.lote.accountId },
+            status: 'enviado',
+          },
+          orderBy: { sentAt: 'desc' },
+          select: { protocol: true, sentAt: true },
+        });
+        await prisma.solicitacaoIsencaoItem.update({
+          where: { id: item.id },
+          data: {
+            status: 'ENVIADA',
+            dataEnvio: enviado?.sentAt ?? new Date(),
+            protocolo: enviado?.protocol ?? null,
+          },
+        });
+        resumo.enviados++;
+      } else if (resultado.status === 'ignorado') {
+        await sincronizarItemDoLote(item.id);
+        resumo.pendentes++;
+      } else {
+        // documento_faltando | identidade_incompleta | nao_automatizavel
+        await prisma.solicitacaoIsencaoItem.update({
+          where: { id: item.id },
+          data: { status: 'PENDENTE_PRE_REQUISITO', ultimoErro: resultado.motivo },
+        });
+        resumo.pendentes++;
+      }
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : String(error);
+      await prisma.solicitacaoIsencaoItem.update({
+        where: { id: item.id },
+        data: { status: 'COM_PROBLEMA', ultimoErro: mensagem, tentativas: { increment: 1 } },
+      });
+      resumo.comProblema++;
+    }
+  }
+
+  await sincronizarStatusDoLote(loteId);
+  const lote = await prisma.solicitacaoIsencaoLote.findUnique({
+    where: { id: loteId },
+    select: { status: true },
+  });
+  resumo.loteStatus = lote?.status ?? 'EM_ANDAMENTO';
+
+  return resumo;
+}

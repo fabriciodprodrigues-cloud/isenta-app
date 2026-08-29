@@ -6,8 +6,15 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Badge } from '@/components/ui/Badge';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { ESTADOS_BR } from '@/lib/utils';
+
+const IMUNIDADE_BADGE: Record<string, { label: string; variant: 'success' | 'warning' | 'error' }> = {
+  IMUNE: { label: 'Imune', variant: 'success' },
+  PARCIAL: { label: 'Parcial', variant: 'warning' },
+  COM_RISCO: { label: 'Com risco', variant: 'error' },
+};
 
 interface Account {
   id: string;
@@ -21,6 +28,7 @@ interface Account {
   cadastrosAtivos: number;
   cadastrosPendentes: number;
   saude: string;
+  imunidade: string;
   status: string;
   responsibleName: string;
   responsibleEmail: string;
@@ -225,6 +233,7 @@ export default function GestaoOrgaos() {
                   <TableCell>Veículos</TableCell>
                   <TableCell>Cadastros</TableCell>
                   <TableCell>Saúde</TableCell>
+                  <TableCell>Imunidade</TableCell>
                   <TableCell>Ações</TableCell>
                 </TableRow>
               </TableHead>
@@ -245,7 +254,18 @@ export default function GestaoOrgaos() {
                     </TableCell>
                     <TableCell>{orgao.saude}</TableCell>
                     <TableCell>
+                      <Badge
+                        size="sm"
+                        variant={IMUNIDADE_BADGE[orgao.imunidade]?.variant ?? 'warning'}
+                      >
+                        {IMUNIDADE_BADGE[orgao.imunidade]?.label ?? orgao.imunidade}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
+                        <Link href={`/dashboard/admin/orgaos/${orgao.id}/imunidade`}>
+                          <Button size="sm" variant="secondary">Imunidade Nacional</Button>
+                        </Link>
                         <Link href={`/dashboard/admin/orgaos/${orgao.id}/onboarding`}>
                           <Button size="sm" variant="secondary">Identidade</Button>
                         </Link>

@@ -1,6 +1,7 @@
 import { prisma } from './prisma';
 import { abrir, type CredencialSmtp } from './cofre';
 import { extrairProtocolo, classificarResposta } from './leitura-respostas';
+import { sincronizarItemDoLote } from './registration-orchestrator';
 
 /**
  * Lê e classifica respostas de concessionárias a ofícios já enviados.
@@ -246,6 +247,35 @@ export async function confirmarResposta(
     },
     data: dadosAtualizacao,
   });
+
+  // Se o par órgão+concessionária dessas solicitações tem um item de
+  // imunidade nacional em aberto (mesmo que a linha específica aprovada
+  // aqui tenha sido criada pelo fluxo manual, não pelo disparo -- o par é
+  // único por veículo+concessionária, então uma linha manual pode ser
+  // exatamente a que faltava pra fechar a cobertura do item), reavalia o
+  // item (ver lib/imunidade.ts). A cobertura real vem sempre do status que
+  // acabou de mudar; isto só mantém o item sincronizado com ela.
+  const afetadas = await prisma.concesssionaireRegistration.findMany({
+    where: { id: { in: resposta.registrationIds } },
+    select: { concessionaireId: true, vehicle: { select: { accountId: true } } },
+  });
+  const paresAfetados = new Map(
+    afetadas.map(a => [`${a.vehicle.accountId}::${a.concessionaireId}`, a])
+  );
+  if (paresAfetados.size > 0) {
+    const itensRelacionados = await prisma.solicitacaoIsencaoItem.findMany({
+      where: {
+        OR: [...paresAfetados.values()].map(a => ({
+          concessionariaId: a.concessionaireId,
+          lote: { accountId: a.vehicle.accountId },
+        })),
+      },
+      select: { id: true },
+    });
+    for (const item of itensRelacionados) {
+      await sincronizarItemDoLote(item.id);
+    }
+  }
 
   await prisma.emailRespostaRecebida.update({
     where: { id: respostaId },

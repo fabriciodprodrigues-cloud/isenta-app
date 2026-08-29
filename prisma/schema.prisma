@@ -99,6 +99,7 @@ model Account {
   portais      PortalCredencial[]
   respostasRecebidas EmailRespostaRecebida[]
   artespCadastros    ArtespCadastro[]
+  solicitacoesIsencaoLote SolicitacaoIsencaoLote[]
 
   @@index([cnpj])
   @@index([status])
@@ -268,12 +269,74 @@ model ConcesssionaireRegistration {
   /// Preenchido quando o robô precisa de decisão humana antes de prosseguir.
   rpaAguardando     String?
 
+  /// Vínculo opcional ao item do lote de disparo nacional que gerou esta
+  /// linha (ver SolicitacaoIsencaoItem) -- null para linhas criadas pelo
+  /// fluxo manual de sempre (RequestExemptionModal).
+  loteItemId        String?
+  loteItem          SolicitacaoIsencaoItem? @relation(fields: [loteItemId], references: [id], onDelete: SetNull)
+
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   @@unique([vehicleId, concessionaireId])
   @@index([vehicleId])
   @@index([concessionaireId])
+  @@index([status])
+  @@index([loteItemId])
+}
+
+// --- Módulo Imunidade Nacional (disparo em lote pra todas as
+// concessionárias ativas de um órgão de uma vez) ---
+//
+// Entidade própria (não um cálculo em cima de ConcesssionaireRegistration):
+// o lote é o registro do evento de disparo; cada item é o status por
+// concessionária. A execução de fato (e-mail, leitura de confirmação)
+// reaproveita processRegistration/confirmarResposta -- ver
+// registration-orchestrator.ts e processar-respostas.ts.
+
+model SolicitacaoIsencaoLote {
+  id           String   @id @default(cuid())
+  accountId    String
+  account      Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  disparadaPor String   // email do admin que disparou
+  dataDisparo  DateTime @default(now())
+
+  escopo       String   @default("NACIONAL")      // NACIONAL | PERSONALIZADO
+  status       String   @default("EM_ANDAMENTO")  // EM_ANDAMENTO | CONCLUIDO_TOTAL | CONCLUIDO_PARCIAL
+
+  itens        SolicitacaoIsencaoItem[]
+
+  createdAt    DateTime @default(now())
+
+  @@index([accountId])
+}
+
+model SolicitacaoIsencaoItem {
+  id               String   @id @default(cuid())
+  loteId           String
+  lote             SolicitacaoIsencaoLote @relation(fields: [loteId], references: [id], onDelete: Cascade)
+
+  concessionariaId String
+  concessionaria   Concessionaire @relation(fields: [concessionariaId], references: [id], onDelete: Restrict)
+
+  metodo    String  @default("EMAIL_OFICIO") // EMAIL_OFICIO -- único suportado no MVP
+  status    String  @default("PENDENTE_PRE_REQUISITO")
+  // PENDENTE_PRE_REQUISITO | NA_FILA | ENVIADA | CONFIRMADA | COM_PROBLEMA | CANCELADA
+
+  protocolo       String?
+  dataEnvio       DateTime?
+  dataConfirmacao DateTime?
+  ultimoErro      String?
+  tentativas      Int      @default(0)
+
+  registrations   ConcesssionaireRegistration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([loteId, concessionariaId])
+  @@index([concessionariaId])
   @@index([status])
 }
 
@@ -352,6 +415,7 @@ model Concessionaire {
   permiteSolicitacoesIlimitadas Boolean @default(false)
 
   registrations ConcesssionaireRegistration[]
+  solicitacaoIsencaoItens SolicitacaoIsencaoItem[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

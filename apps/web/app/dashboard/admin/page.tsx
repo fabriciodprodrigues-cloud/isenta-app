@@ -15,6 +15,8 @@ interface Pendencia {
 }
 
 interface Resumo {
+  orgaosImunes: number;
+  orgaosComRisco: number;
   orgaosAtivos: number;
   veiculosGerenciados: number;
   cadastrosAtivos: number;
@@ -130,6 +132,8 @@ export default function AdminDashboard() {
     { rotulo: 'Vencidos', valor: resumo.cadastrosVencidos, cor: 'text-red-400' },
     { rotulo: 'TAGs Vinculadas', valor: resumo.tagsAtivadas, cor: 'text-green-400' },
     { rotulo: 'TAGs em Estoque', valor: resumo.tagsEstoque, cor: 'text-amber-400' },
+    { rotulo: 'Órgãos Imunes', valor: resumo.orgaosImunes, cor: 'text-green-400' },
+    { rotulo: 'Órgãos com Risco', valor: resumo.orgaosComRisco, cor: 'text-red-400' },
   ];
 
   return (

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { days_until_expiry } from '@/lib/utils';
+import { calcularImunidadeEmLote } from '@/lib/imunidade';
 
 // Usa auth() (le cookies/headers), portanto nunca pode ser pre-renderizada.
 export const dynamic = 'force-dynamic';
@@ -78,7 +79,21 @@ export async function GET() {
       else if (dias <= 7) vencendo++;
     }
 
+    const contasAtivas = await prisma.account.findMany({
+      where: { status: 'active' },
+      select: { id: true },
+    });
+    const imunidadePorConta = await calcularImunidadeEmLote(contasAtivas.map(c => c.id));
+    let orgaosImunes = 0;
+    let orgaosComRisco = 0;
+    for (const resumo of imunidadePorConta.values()) {
+      if (resumo.status === 'IMUNE') orgaosImunes++;
+      else if (resumo.status === 'COM_RISCO') orgaosComRisco++;
+    }
+
     return NextResponse.json({
+      orgaosImunes,
+      orgaosComRisco,
       orgaosAtivos,
       veiculosGerenciados: await prisma.vehicle.count(),
       cadastrosAtivos: porStatus['aprovado'] ?? 0,
