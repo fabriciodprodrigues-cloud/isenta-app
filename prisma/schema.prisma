@@ -100,6 +100,7 @@ model Account {
   respostasRecebidas EmailRespostaRecebida[]
   artespCadastros    ArtespCadastro[]
   solicitacoesIsencaoLote SolicitacaoIsencaoLote[]
+  contratos          Contrato[]
 
   @@index([cnpj])
   @@index([status])
@@ -235,6 +236,7 @@ model Vehicle {
   documents     Document[]
   tags          Tag[]
   artespVeiculos ArtespVeiculo[]
+  contratoVeiculos ContratoVeiculo[]
 
   @@unique([accountId, plate])
   @@index([accountId])
@@ -538,4 +540,130 @@ model ArtespDocumento {
 
   @@unique([artespCadastroId, tipo])
   @@index([artespCadastroId])
+}
+
+// --- Módulo Financeiro (contratos, faturas, cobrança) ---
+//
+// Uso interno do time comercial/financeiro da Isenta -- o operador (órgão)
+// nunca acessa isto. Dinheiro em centavos (Int), não Decimal: o projeto não
+// usa Decimal em lugar nenhum, e o Decimal do Prisma serializa como string
+// no JSON (quebra silenciosa pra quem consumir a API sem saber). "Vencido"
+// e "atrasada" não são status persistidos -- são calculados a partir de
+// dataVencimento na hora da consulta (ver lib/financeiro.ts), porque não há
+// onde rodar um job proativo (os 2 crons do Hobby já estão ocupados, e
+// apps/worker está morto). Isso também evita status desatualizado.
+
+model Contrato {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  /// Se este é um "mini-contrato" gerado por adição de veículo, aponta pro
+  /// contrato raiz do órgão. Cada um renova com seu próprio vencimento --
+  /// nunca se fundem (decisão confirmada com o usuário).
+  contratoPaiId   String?
+  contratoPai     Contrato?  @relation("ContratoPai", fields: [contratoPaiId], references: [id], onDelete: SetNull)
+  contratosFilhos Contrato[] @relation("ContratoPai")
+
+  precoUnitarioMensalCentavos Int
+  /// Quantidade no fechamento -- pra contagem ATUAL de veículos cobertos,
+  /// contar veiculos.filter(ativo) em vez de usar este campo.
+  qtdVeiculos                 Int
+  /// precoUnitarioMensalCentavos * 12 * qtdVeiculos. Fica congelado como
+  /// histórico do que foi de fato pago -- remover veículo depois não
+  /// recalcula (decisão confirmada: sem estorno/crédito).
+  valorTotalPeriodoCentavos   Int
+
+  dataInicio     DateTime
+  dataVencimento DateTime
+
+  modalidadeContratacao String  // licitacao_pregao | dispensa_valor | inexigibilidade | adesao_ata | compra_direta | outro
+  numeroProcesso        String?
+
+  /// Só os estados que dependem de ação humana. "Vencido" é calculado
+  /// (dataVencimento < hoje && status='ativo'), não fica guardado aqui.
+  status      String  @default("ativo") // ativo | cancelado
+  observacoes String?
+
+  veiculos        ContratoVeiculo[]
+  faturas         Fatura[]
+  historicoPrecos HistoricoPrecoContrato[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([accountId])
+  @@index([status])
+  @@index([dataVencimento])
+}
+
+model ContratoVeiculo {
+  id         String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  vehicleId  String
+  vehicle    Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  dataInclusao DateTime  @default(now())
+  /// Preenchido quando removido do contrato -- sem estorno, só marca
+  /// ativo:false (decisão confirmada). valorTotalPeriodoCentavos do
+  /// contrato não muda.
+  dataExclusao DateTime?
+  ativo        Boolean   @default(true)
+
+  @@unique([contratoId, vehicleId])
+  @@index([vehicleId])
+}
+
+model Fatura {
+  id         String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  tipo           String  // fechamento_inicial | renovacao | aditivo
+  valorCentavos  Int
+  formaPagamento String  // boleto | pix | empenho | ordem_bancaria | outro
+  numeroEmpenho  String?
+  parcelaNumero  Int?
+  parcelaTotal   Int?
+
+  dataEmissao    DateTime  @default(now())
+  dataVencimento DateTime
+  dataPagamento  DateTime?
+
+  /// "Atrasada" é calculado (dataVencimento < hoje && status em
+  /// emitida/aguardando_empenho), não guardado aqui -- nunca fica
+  /// desatualizado, e marcar como paga é sempre ação humana explícita.
+  status String @default("emitida") // emitida | aguardando_empenho | paga | cancelada
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([contratoId])
+  @@index([status])
+  @@index([dataVencimento])
+}
+
+/// Auditoria de reajuste -- alimenta o relatório de "descontos concedidos"
+/// (comparação com ConfiguracaoFinanceira.precoReferenciaMensalCentavos).
+model HistoricoPrecoContrato {
+  id         String   @id @default(cuid())
+  contratoId String
+  contrato   Contrato @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+
+  precoAnteriorCentavos Int
+  precoNovoCentavos     Int
+  dataAlteracao         DateTime @default(now())
+  motivo                String?
+
+  @@index([contratoId])
+}
+
+/// Linha única (id fixo). Só pré-preenche o formulário de novo contrato --
+/// mudar isto nunca afeta contratos já existentes, que guardam seu próprio
+/// precoUnitarioMensalCentavos.
+model ConfiguracaoFinanceira {
+  id                            String   @id @default("singleton")
+  precoReferenciaMensalCentavos Int      @default(9990) // R$ 99,90
+  updatedAt                     DateTime @updatedAt
 }

@@ -263,6 +263,9 @@ export default function GestaoOrgaos() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap justify-end gap-2">
+                        <Link href={`/dashboard/admin/orgaos/${orgao.id}/financeiro`}>
+                          <Button size="sm" variant="secondary">Financeiro</Button>
+                        </Link>
                         <Link href={`/dashboard/admin/orgaos/${orgao.id}/imunidade`}>
                           <Button size="sm" variant="secondary">Imunidade Nacional</Button>
                         </Link>
