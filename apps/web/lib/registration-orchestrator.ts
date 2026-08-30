@@ -566,10 +566,17 @@ export interface ResumoProcessamentoLote {
  * pré-requisito no momento do envio, então tentar de novo é o próprio
  * jeito de saber se o pré-requisito foi satisfeito -- uma checagem prévia
  * duplicaria essa lógica.
+ *
+ * Limite baixo de propósito: cada item pode envolver timbre, geração de
+ * docx, conversão pra PDF no relay da VPS e envio SMTP -- 30 itens numa
+ * chamada só estourou o Vercel Runtime Timeout de 60s em produção (órgão
+ * com 35 concessionárias elegíveis). O admin clica "Processar pendências"
+ * de novo pra continuar o lote -- mesmo padrão já usado em
+ * processPendingRegistrations.
  */
 export async function processarItensDoLote(
   loteId: string,
-  limite = 30
+  limite = 8
 ): Promise<ResumoProcessamentoLote> {
   const itens = await prisma.solicitacaoIsencaoItem.findMany({
     where: { loteId, status: { in: ['PENDENTE_PRE_REQUISITO', 'NA_FILA'] } },
