@@ -8,7 +8,7 @@ import { execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { randomUUID, timingSafeEqual } from 'crypto';
 
 // nodemailer não exporta MailComposer no entrypoint principal, só no
 // caminho interno lib/mail-composer -- sem tipos publicados que o
@@ -68,8 +68,20 @@ const SEGREDO_INTERNO = variavelObrigatoria('INTERNAL_SECRET');
  * poderia mandar e-mail em nome de um órgão ou ler a caixa de entrada dele.
  */
 function exigirSegredo(req: Request, res: Response, next: NextFunction): void {
-  const recebido = req.header('x-internal-secret');
-  if (recebido !== SEGREDO_INTERNO) {
+  const recebido = req.header('x-internal-secret') ?? '';
+
+  // timingSafeEqual exige buffers do mesmo tamanho -- comparar direto com
+  // !== vazaria, por tempo de resposta, quantos caracteres do segredo o
+  // chamador acertou. Cofre.ts's própria comparação de tag do GCM já usa
+  // o equivalente nativo do Node; aqui replicamos manualmente porque é
+  // uma string comum, não um AEAD.
+  const bufRecebido = Buffer.from(recebido);
+  const bufEsperado = Buffer.from(SEGREDO_INTERNO);
+  const autorizado =
+    bufRecebido.length === bufEsperado.length &&
+    timingSafeEqual(bufRecebido, bufEsperado);
+
+  if (!autorizado) {
     res.status(401).json({ erro: 'Não autorizado' });
     return;
   }

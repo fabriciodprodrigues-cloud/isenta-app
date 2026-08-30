@@ -46,7 +46,7 @@ export function cofreConfigurado(): boolean {
 export function guardar(valor: unknown): string {
   const chave = obterChave();
   const iv = randomBytes(TAMANHO_IV);
-  const cipher = createCipheriv(ALGORITMO, chave, iv);
+  const cipher = createCipheriv(ALGORITMO, chave, iv, { authTagLength: TAMANHO_TAG });
 
   const conteudo = Buffer.concat([
     cipher.update(JSON.stringify(valor), 'utf8'),
@@ -67,7 +67,7 @@ export function abrir<T>(cifrado: string): T {
   const tag = bruto.subarray(TAMANHO_IV, TAMANHO_IV + TAMANHO_TAG);
   const conteudo = bruto.subarray(TAMANHO_IV + TAMANHO_TAG);
 
-  const decipher = createDecipheriv(ALGORITMO, chave, iv);
+  const decipher = createDecipheriv(ALGORITMO, chave, iv, { authTagLength: TAMANHO_TAG });
   decipher.setAuthTag(tag);
 
   const aberto = Buffer.concat([decipher.update(conteudo), decipher.final()]);

@@ -28,10 +28,10 @@ jobs:
           - 5432:5432
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
 
@@ -58,8 +58,15 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # ATENÇÃO: vercel/action não existe como Action publicada (verificado --
+      # api.github.com/repos/vercel/action devolve 404). Este step nunca
+      # rodou de verdade; os deploys reais acontecem pela integração nativa
+      # da Vercel com o GitHub, fora deste workflow. Não dá pra fixar por SHA
+      # uma Action que não existe -- precisa trocar por uma alternativa real
+      # (ex.: amondnet/vercel-action) ou remover este job, decisão de produto
+      # que não coube no escopo desta rodada de segurança.
       - name: Deploy to Vercel
         uses: vercel/action@v4
         with:
@@ -70,7 +77,7 @@ jobs:
 
       - name: Notify Slack
         if: success()
-        uses: slackapi/slack-github-action@v1
+        uses: slackapi/slack-github-action@fcfb566f8b0aab22203f066d80ca1d7e4b5d05b3 # v1
         with:
           payload: |
             {
