@@ -15,10 +15,8 @@ import {
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Endereço confirmado pelo usuário para protocolo por e-mail junto à
-// SUROD/ARTESP (ver seção 11, pendência 2, da especificação do módulo --
-// não havia canal automatizado antes disso ser confirmado).
-const DESTINO_ARTESP = 'protocolo@artesp.sp.gov.br';
+// Endereço oficial da ARTESP para protocolo de isenção por e-mail.
+const DESTINO_ARTESP = 'isencao@artesp.sp.gov.br';
 
 class RemetenteDoOrgaoAusenteArtespError extends Error {
   constructor(orgao: string) {

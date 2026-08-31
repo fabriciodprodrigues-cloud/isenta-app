@@ -12,7 +12,7 @@
  *
  * Exclusão à parte: concessionárias com regulador='ARTESP' NUNCA entram
  * aqui, nem como EMAIL nem como "sem canal" -- a ARTESP centraliza num
- * único e-mail (protocolo@artesp.sp.gov.br) o pedido de isenção pra TODAS
+ * único e-mail (isencao@artesp.sp.gov.br) o pedido de isenção pra TODAS
  * as concessionárias sob sua responsabilidade de uma vez só (confirmado:
  * 19 das 22 concessionárias reguladas por ela compartilham esse mesmo
  * endereço). Se o disparo nacional as tratasse como itens EMAIL comuns,

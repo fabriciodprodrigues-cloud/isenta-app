@@ -27,7 +27,7 @@ const JA_EM_CURSO_OU_RESOLVIDO = new Set(['enviado', 'aguardando_resposta', 'apr
  *
  * Exclui concessionárias com regulador='ARTESP': a ARTESP centraliza o
  * pedido de todas as concessionárias sob sua responsabilidade num único
- * e-mail (protocolo@artesp.sp.gov.br) -- tratá-las como itens EMAIL comuns
+ * e-mail (isencao@artesp.sp.gov.br) -- tratá-las como itens EMAIL comuns
  * mandaria um e-mail redundante por concessionária pra ela. Essas usam o
  * módulo ARTESP dedicado (ver artesp-*.ts), não este disparo. Mesma
  * exclusão de lib/imunidade.ts, que faz o cálculo de cobertura.
