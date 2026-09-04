@@ -9,6 +9,8 @@ import type { VeiculoDoOficio, DadosDoOficio } from './oficio-isencao';
 import { montarOficioDocx } from './oficio-docx';
 import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
 import { abrir, type CredencialSmtp } from './cofre';
+import { gerarDocumentoConcessionaria } from './modelo-documento';
+import type { DadosParaModelo } from './modelo-documento-tipos';
 
 /**
  * Resultado do envio de um ofício.
@@ -166,7 +168,16 @@ export async function processRegistration(
 
   const concessionaria = await prisma.concessionaire.findUnique({
     where: { id: referencia.concessionaireId },
-    select: { id: true, name: true, canalIsentos: true, tipoCanal: true },
+    select: {
+      id: true, name: true, canalIsentos: true, tipoCanal: true,
+      // Filtrado por ativo:true -- um modelo em rascunho/desativado nunca
+      // deve afetar um envio real, só a pré-visualização (que consulta a
+      // linha diretamente, sem esse filtro).
+      modeloDocumento: {
+        where: { ativo: true },
+        select: { tipo: true, arquivoUrl: true, mapeamentoCampos: true, formatoSaida: true },
+      },
+    },
   });
 
   if (!concessionaria) {
@@ -344,6 +355,40 @@ export async function processRegistration(
     },
   };
 
+  // Concessionária com modelo próprio (Word/Excel específico dela) tem
+  // prioridade total: é um documento completamente diferente, com o próprio
+  // timbre já embutido, então o ramo de modeloOficioUrl do ÓRGÃO abaixo nem
+  // deve rodar quando este existir. Falha aqui (modelo quebrado, tag/célula
+  // não bate) nunca bloqueia o envio -- cai pro caminho antigo, mesma
+  // filosofia já usada pro modeloOficioUrl do órgão.
+  let anexoDocumentoEspecifico: AnexoDocumento | null = null;
+
+  if (concessionaria.modeloDocumento?.arquivoUrl) {
+    const modeloBuffer = await carregarModeloOficio(concessionaria.modeloDocumento.arquivoUrl);
+    if (modeloBuffer) {
+      try {
+        const dadosParaModelo: DadosParaModelo = {
+          orgao: dadosDoOficio.orgao,
+          concessionariaNome: concessionaria.name,
+          numeroOficio,
+          protocolo,
+          veiculos,
+          dataAtual: new Date(),
+        };
+        const documento = await gerarDocumentoConcessionaria(dadosParaModelo, {
+          tipo: concessionaria.modeloDocumento.tipo,
+          mapeamentoCampos: concessionaria.modeloDocumento.mapeamentoCampos,
+          formatoSaida: concessionaria.modeloDocumento.formatoSaida,
+          arquivoBuffer: modeloBuffer,
+        });
+        anexoDocumentoEspecifico = { fileName: documento.fileName, content: documento.buffer };
+        nomesAnexos.unshift(documento.fileName);
+      } catch (erro) {
+        console.error(`Falha ao gerar documento específico de ${concessionaria.name}:`, erro);
+      }
+    }
+  }
+
   // Órgão com modelo próprio: gera o PDF do ofício (corpo programático
   // enxertado no cabeçalho/timbre do modelo) e anexa, em vez de mandar o
   // texto completo no corpo do e-mail. Modelo quebrado ou conversão
@@ -351,7 +396,7 @@ export async function processRegistration(
   // por causa disso.
   let anexoOficioPdf: AnexoDocumento | null = null;
 
-  if (orgao.modeloOficioUrl) {
+  if (!anexoDocumentoEspecifico && orgao.modeloOficioUrl) {
     const modelo = await carregarModeloOficio(orgao.modeloOficioUrl);
     if (modelo) {
       try {
@@ -368,13 +413,14 @@ export async function processRegistration(
     }
   }
 
-  if (anexoOficioPdf) anexos.unshift(anexoOficioPdf);
+  if (anexoDocumentoEspecifico) anexos.unshift(anexoDocumentoEspecifico);
+  else if (anexoOficioPdf) anexos.unshift(anexoOficioPdf);
 
   const { anexosEnviados } = await enviarOficioDeIsencao({
     destino: concessionaria.canalIsentos,
     remetente,
     anexos,
-    usarMensagemCurta: Boolean(anexoOficioPdf),
+    usarMensagemCurta: Boolean(anexoDocumentoEspecifico) || Boolean(anexoOficioPdf),
     dados: dadosDoOficio,
   });
 

@@ -44,6 +44,9 @@ export async function GET(request: Request) {
         // A tela de admin edita o canal e precisa reexibir a observação; sem
         // ela, salvar uma alteração apagaria a nota já registrada.
         observacoes: true,
+        // Alimenta o badge "Genérico"/"DOCX ativo"/"XLSX em config." na
+        // listagem -- ver dashboard/admin/concessionarias/page.tsx.
+        modeloDocumento: { select: { tipo: true, ativo: true } },
       },
       orderBy: [
         { regulador: 'asc' },

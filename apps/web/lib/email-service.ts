@@ -180,7 +180,10 @@ export class ConversaoDocxFalhouError extends Error {
  * cai de volta para o HTML completo em vez de bloquear o envio) — por isso
  * este erro nunca é tratado como fatal aqui, só propagado.
  */
-export async function converterDocxParaPdf(docxBuffer: Buffer): Promise<Buffer> {
+export async function converterParaPdf(
+  buffer: Buffer,
+  extensaoEntrada: 'docx' | 'xlsx' = 'docx'
+): Promise<Buffer> {
   const relayUrl = process.env.EMAIL_RELAY_URL;
   const relaySecret = process.env.EMAIL_RELAY_SECRET;
   if (!relayUrl || !relaySecret) {
@@ -195,7 +198,7 @@ export async function converterDocxParaPdf(docxBuffer: Buffer): Promise<Buffer> 
         'Content-Type': 'application/json',
         'x-internal-secret': relaySecret,
       },
-      body: JSON.stringify({ docxBase64: docxBuffer.toString('base64') }),
+      body: JSON.stringify({ arquivoBase64: buffer.toString('base64'), extensaoEntrada }),
       signal: AbortSignal.timeout(20_000),
     });
   } catch (erro) {
@@ -213,6 +216,11 @@ export async function converterDocxParaPdf(docxBuffer: Buffer): Promise<Buffer> 
 
   const { pdfBase64 } = await resposta.json();
   return Buffer.from(pdfBase64, 'base64');
+}
+
+/** Atalho para o caso original (docx) -- mantido para não mexer nos chamadores existentes. */
+export async function converterDocxParaPdf(docxBuffer: Buffer): Promise<Buffer> {
+  return converterParaPdf(docxBuffer, 'docx');
 }
 
 /**

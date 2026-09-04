@@ -274,7 +274,13 @@ app.post('/send-email', exigirSegredo, async (req: Request<{}, {}, CorpoEnvio>, 
 });
 
 interface CorpoConversao {
-  /** .docx do ofício já com o corpo preenchido, em base64. */
+  /** Arquivo a converter, em base64 -- .docx ou .xlsx. */
+  arquivoBase64?: string;
+  /** docx | xlsx -- decide a extensão do arquivo temporário, que é o que o
+   *  soffice usa para escolher o filtro de importação certo. */
+  extensaoEntrada?: 'docx' | 'xlsx';
+  /** @deprecated alias de arquivoBase64, mantido por compatibilidade com
+   *  chamadores antigos que só convertiam docx. */
   docxBase64?: string;
 }
 
@@ -307,10 +313,12 @@ function execFileComTimeout(
  * enviando ao mesmo tempo bastam para isso acontecer.
  */
 app.post('/convert-docx-to-pdf', exigirSegredo, async (req: Request<{}, {}, CorpoConversao>, res: Response) => {
-  const { docxBase64 } = req.body ?? {};
+  const { arquivoBase64, docxBase64, extensaoEntrada } = req.body ?? {};
+  const conteudoBase64 = arquivoBase64 ?? docxBase64;
+  const extensao = extensaoEntrada ?? 'docx';
 
-  if (!docxBase64) {
-    res.status(400).json({ erro: 'Campo obrigatório: docxBase64.' });
+  if (!conteudoBase64) {
+    res.status(400).json({ erro: 'Campo obrigatório: arquivoBase64.' });
     return;
   }
 
@@ -320,8 +328,8 @@ app.post('/convert-docx-to-pdf', exigirSegredo, async (req: Request<{}, {}, Corp
   try {
     await fs.mkdir(dir, { recursive: true });
 
-    const entrada = path.join(dir, 'oficio.docx');
-    await fs.writeFile(entrada, Buffer.from(docxBase64, 'base64'));
+    const entrada = path.join(dir, `documento.${extensao}`);
+    await fs.writeFile(entrada, Buffer.from(conteudoBase64, 'base64'));
 
     await execFileComTimeout(
       'soffice',
@@ -338,7 +346,7 @@ app.post('/convert-docx-to-pdf', exigirSegredo, async (req: Request<{}, {}, Corp
       20_000
     );
 
-    const pdf = await fs.readFile(path.join(dir, 'oficio.pdf'));
+    const pdf = await fs.readFile(path.join(dir, 'documento.pdf'));
 
     res.status(200).json({ pdfBase64: pdf.toString('base64') });
   } catch (erro) {

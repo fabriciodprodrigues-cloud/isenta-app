@@ -68,6 +68,29 @@ const schema = z
     }
   });
 
+/** Nome/dados básicos de uma concessionária -- alimenta subpáginas de detalhe (ex.: modelo de documento). */
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await auth();
+
+  if (!session || session.user?.role !== 'admin') {
+    return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+  }
+
+  const concessionaria = await prisma.concessionaire.findUnique({
+    where: { id: params.id },
+    select: { id: true, name: true, tipoCanal: true, canalIsentos: true },
+  });
+
+  if (!concessionaria) {
+    return NextResponse.json({ error: 'Concessionária não encontrada' }, { status: 404 });
+  }
+
+  return NextResponse.json(concessionaria);
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }

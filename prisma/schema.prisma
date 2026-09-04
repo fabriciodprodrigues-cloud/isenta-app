@@ -418,6 +418,7 @@ model Concessionaire {
 
   registrations ConcesssionaireRegistration[]
   solicitacaoIsencaoItens SolicitacaoIsencaoItem[]
+  modeloDocumento ModeloDocumentoConcessionaria?
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -666,4 +667,72 @@ model ConfiguracaoFinanceira {
   id                            String   @id @default("singleton")
   precoReferenciaMensalCentavos Int      @default(9990) // R$ 99,90
   updatedAt                     DateTime @updatedAt
+}
+
+// --- Módulo de modelos de documento por concessionária ---
+// Cada concessionária pode exigir o próprio formato de solicitação de
+// isenção (Word/Excel com layout fixo). Sem modelo específico ativo, o
+// envio continua usando o ofício genérico existente (HTML ou o
+// modeloOficioUrl do ÓRGÃO) -- ver registration-orchestrator.ts.
+
+enum TipoModeloDocumento {
+  GENERICO   // passthrough: comportamento atual (HTML genérico ou modeloOficioUrl do órgão)
+  DOCX       // docxtemplater sobre um .docx enviado pela concessionária
+  XLSX       // preenchimento via JSZip/XML cru sobre um .xlsx enviado pela concessionária
+  // PDF_FORM e PORTAL/RPA ficam fora do MVP -- não entram no enum ainda,
+  // adicionar quando o gerador correspondente existir (evita valor "morto"
+  // que nenhum código trata).
+}
+
+enum FormatoSaidaDocumento {
+  PDF              // converte via LibreOffice no relay antes de anexar
+  MANTER_ORIGINAL  // anexa o .docx/.xlsx preenchido, sem converter
+}
+
+/// Configuração do documento específico de uma concessionária -- substitui o
+/// ofício genérico (HTML ou o modeloOficioUrl do ÓRGÃO) quando ativo. Uma
+/// linha por concessionária (@unique): não há versionamento de histórico no
+/// MVP, sobrescrever é a operação de "atualizar modelo".
+model ModeloDocumentoConcessionaria {
+  id               String   @id @default(cuid())
+  concessionariaId String   @unique
+  concessionaria   Concessionaire @relation(fields: [concessionariaId], references: [id], onDelete: Cascade)
+
+  tipo             TipoModeloDocumento @default(GENERICO)
+
+  /// Pathname do arquivo-modelo no Blob privado (.docx ou .xlsx enviado pela
+  /// concessionária). Null quando tipo=GENERICO.
+  arquivoUrl       String?
+  /// Nome original do arquivo enviado, só para exibir na UI.
+  arquivoNome      String?
+  /// Nome + versão do formato, ex.: "FOR.CCA.02" (Rota Verde) -- livre,
+  /// aparece na tela do admin para conferência humana contra o formulário
+  /// físico.
+  codigoFormulario String?
+
+  /// Config de mapeamento -- shape depende de `tipo`:
+  ///   DOCX: { campos: { <chaveDado>: <tagPlaceholder> } }
+  ///   XLSX: { campos: { <chaveDado>: <celula ex "B4"> },
+  ///           tabelaVeiculos: { linhaInicial: number,
+  ///                             colunas: { <chaveVeiculo>: <letraColuna> } } }
+  /// Json (não String) -- validado por zod na API antes de gravar.
+  mapeamentoCampos Json?
+
+  formatoSaida     FormatoSaidaDocumento @default(PDF)
+
+  /// Só um modelo "ativo" por concessionária conta para o envio real -- o
+  /// admin pode subir/editar um modelo em rascunho, pré-visualizar à vontade,
+  /// e só ativar quando confiante. Envio real (processRegistration) só olha
+  /// para linhas com ativo=true; inativo cai automaticamente de volta para
+  /// o caminho GENERICO existente.
+  ativo            Boolean  @default(false)
+
+  criadoPor        String?  // e-mail do admin que fez o upload original
+  atualizadoPor    String?  // e-mail do admin que fez a última alteração
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tipo])
+  @@index([ativo])
 }

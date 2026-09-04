@@ -17,6 +17,17 @@ interface Concessionaria {
   tipoCanal: string | null;
   observacoes: string | null;
   ativoParaCadastro: boolean;
+  modeloDocumento: { tipo: string; ativo: boolean } | null;
+}
+
+function badgeModelo(modelo: Concessionaria['modeloDocumento']) {
+  if (!modelo || modelo.tipo === 'GENERICO') {
+    return { texto: 'Genérico', cor: 'bg-gray-900/20 text-gray-400' };
+  }
+  if (modelo.ativo) {
+    return { texto: `${modelo.tipo} ativo`, cor: 'bg-green-900/20 text-green-400' };
+  }
+  return { texto: `${modelo.tipo} em config.`, cor: 'bg-amber-900/20 text-amber-400' };
 }
 
 const ROTULO_CANAL: Record<string, string> = {
@@ -373,6 +384,7 @@ export default function GestaoConcessionarias() {
                   <TableCell>Estados</TableCell>
                   <TableCell>Canal</TableCell>
                   <TableCell>Destino</TableCell>
+                  <TableCell>Modelo de documento</TableCell>
                   <TableCell>Ação</TableCell>
                 </TableRow>
               </TableHead>
@@ -380,7 +392,7 @@ export default function GestaoConcessionarias() {
                 {filtradas.map(c =>
                   editando === c.id ? (
                     <TableRow key={c.id}>
-                      <TableCell colSpan={6}>
+                      <TableCell colSpan={7}>
                         <div className="space-y-3 rounded border border-green/30 bg-ink-700/40 p-4">
                           <p className="font-medium text-paper">{c.name}</p>
 
@@ -512,13 +524,31 @@ export default function GestaoConcessionarias() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => abrirEdicao(c)}
-                          className="rounded px-2 py-1 text-sm text-green hover:bg-green/10"
-                        >
-                          Editar
-                        </button>
+                        {(() => {
+                          const badge = badgeModelo(c.modeloDocumento);
+                          return (
+                            <span className={`rounded px-2 py-1 text-xs ${badge.cor}`}>
+                              {badge.texto}
+                            </span>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => abrirEdicao(c)}
+                            className="rounded px-2 py-1 text-sm text-green hover:bg-green/10"
+                          >
+                            Editar
+                          </button>
+                          <Link
+                            href={`/dashboard/admin/concessionarias/${c.id}/modelo`}
+                            className="rounded px-2 py-1 text-sm text-green hover:bg-green/10"
+                          >
+                            Modelo
+                          </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
