@@ -11,16 +11,22 @@ import { gerarDeclaracaoTag } from '../lib/declaracao-tag';
 import { dadosDeExemploParaModelo } from '../lib/dados-exemplo';
 
 async function main() {
+  // Timbre real opcional via argv[2], pra testar o embutimento da imagem --
+  // sem isso, gera sem timbre (caso mais comum, órgão sem modeloOficioUrl).
+  const timbreUrl = process.argv[2];
+
   const resultado = await gerarDeclaracaoTag(
     dadosDeExemploParaModelo.orgao,
-    dadosDeExemploParaModelo.veiculos.map(v => ({
+    dadosDeExemploParaModelo.veiculos.map((v, i) => ({
       plate: v.plate,
       renavam: v.renavam,
       marca: v.marca,
       modelo: v.modelo,
       tag: v.tag ?? '00000000000',
+      tagOperadora: i % 2 === 0 ? 'Sem Parar' : 'ConectCar',
     })),
-    dadosDeExemploParaModelo.protocolo
+    dadosDeExemploParaModelo.protocolo,
+    timbreUrl
   );
 
   await writeFile(`declaracao-tag-teste.${resultado.fileName.split('.').pop()}`, resultado.buffer);

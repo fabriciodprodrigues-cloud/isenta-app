@@ -225,7 +225,7 @@ export async function processRegistration(
           anoModelo: true,
           account: true,
           documents: { select: { type: true, fileName: true, url: true } },
-          tags: { select: { serialNumber: true } },
+          tags: { select: { serialNumber: true, operadora: true } },
         },
       },
     },
@@ -451,8 +451,16 @@ export async function processRegistration(
   try {
     const declaracao = await gerarDeclaracaoTag(
       dadosDoOficio.orgao,
-      veiculos.map(v => ({ plate: v.plate, renavam: v.renavam, marca: v.marca, modelo: v.modelo, tag: v.tag! })),
-      protocolo
+      grupo.map(r => ({
+        plate: r.vehicle.plate,
+        renavam: r.vehicle.renavam,
+        marca: r.vehicle.marca,
+        modelo: r.vehicle.modelo,
+        tag: r.vehicle.tags[0]!.serialNumber,
+        tagOperadora: r.vehicle.tags[0]!.operadora,
+      })),
+      protocolo,
+      orgao.timbreUrl
     );
     anexoDeclaracaoTag = { fileName: declaracao.fileName, content: declaracao.buffer };
     documentoDeclaracaoTag = {
