@@ -57,6 +57,19 @@ export async function GET(
       );
     }
 
+    // Mesma regra da listagem (api/vehicles/route.ts): um operador só acessa
+    // veículos da própria conta. Sem isso, bastava saber o id de um veículo
+    // de outro órgão para ver (e, no PUT, editar) a frota alheia.
+    if (
+      session.user?.role === 'operator' &&
+      vehicle.accountId !== session.user?.accountId
+    ) {
+      return NextResponse.json(
+        { error: 'Veículo não encontrado' },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json(vehicle);
   } catch (error) {
     console.error('Erro ao buscar veículo:', error);
@@ -83,6 +96,20 @@ export async function PUT(
 
     if (data.plate) {
       data.plate = data.plate.toUpperCase();
+    }
+
+    // Mesma regra do GET acima: operador só edita veículo da própria conta.
+    if (session.user?.role === 'operator') {
+      const existente = await prisma.vehicle.findUnique({
+        where: { id: params.id },
+        select: { accountId: true },
+      });
+      if (!existente || existente.accountId !== session.user?.accountId) {
+        return NextResponse.json(
+          { error: 'Veículo não encontrado' },
+          { status: 404 },
+        );
+      }
     }
 
     const vehicle = await prisma.vehicle.update({

@@ -34,6 +34,19 @@ export async function GET(
     return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
   }
 
+  // Mesma regra usada em api/vehicles/[id]/route.ts: um operador só acessa a
+  // própria conta. Sem isso, bastava saber o accountId de outro órgão para
+  // ver seus usuários (nome/e-mail/role) e a frota inteira.
+  if (
+    session.user?.role === 'operator' &&
+    params.accountId !== session.user?.accountId
+  ) {
+    return NextResponse.json(
+      { error: 'Conta não encontrada' },
+      { status: 404 },
+    );
+  }
+
   try {
     const account = await prisma.account.findUnique({
       where: { id: params.accountId },
