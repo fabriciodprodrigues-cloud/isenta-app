@@ -272,6 +272,13 @@ model ConcesssionaireRegistration {
   documentoRecuperacaoStatus    String?   // nao_encontrado | ambiguo | recuperado
   documentoRecuperacaoTentadoEm DateTime?
 
+  /// Declaração de Instalação de TAG -- anexo obrigatório em todo envio
+  /// (junto do ofício/formulário, nunca no lugar dele), exceto onde o
+  /// próprio módulo de destino já a incorpore (ex.: ARTESP, que roda fora
+  /// de ConcesssionaireRegistration e nunca chega aqui).
+  declaracaoTagUrl      String?
+  declaracaoTagGeradaEm DateTime?
+
   // --- Execução pelo robô de portal ---
   /// Quantas vezes o robô já tentou. Serve para desistir depois de N falhas
   /// em vez de repetir indefinidamente contra um portal que mudou.

@@ -82,6 +82,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (resultado.status === 'tag_faltando') {
+      return NextResponse.json(
+        { success: false, error: resultado.motivo },
+        { status: 428 }
+      );
+    }
+
     if (resultado.status === 'identidade_incompleta') {
       return NextResponse.json(
         {

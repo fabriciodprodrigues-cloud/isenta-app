@@ -12,6 +12,7 @@ import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
 import { abrir, type CredencialSmtp } from './cofre';
 import { gerarDocumentoConcessionaria } from './modelo-documento';
 import type { DadosParaModelo } from './modelo-documento-tipos';
+import { gerarDeclaracaoTag } from './declaracao-tag';
 
 /**
  * Resultado do envio de um ofício.
@@ -30,6 +31,7 @@ export type ResultadoEnvio =
     }
   | { status: 'nao_automatizavel'; motivo: string }
   | { status: 'documento_faltando'; motivo: string }
+  | { status: 'tag_faltando'; motivo: string }
   | { status: 'identidade_incompleta'; motivo: string; pendencias: Pendencia[] }
   | { status: 'ignorado'; motivo: string };
 
@@ -253,6 +255,23 @@ export async function processRegistration(
     };
   }
 
+  // Toda solicitação sai com a Declaração de Instalação de TAG (ver
+  // lib/declaracao-tag.ts) -- não se declara instalação de uma TAG que não
+  // existe, então sem TAG vinculada a solicitação fica pendente, igual à
+  // falta de CRLV acima.
+  const semTag = grupo.filter(r => !r.vehicle.tags[0]?.serialNumber);
+
+  if (semTag.length > 0) {
+    const placas = semTag.map(r => r.vehicle.plate).join(', ');
+    return {
+      status: 'tag_faltando',
+      motivo:
+        semTag.length === grupo.length
+          ? `Vincule uma TAG antes de solicitar: ${placas}`
+          : `Falta TAG vinculada em ${semTag.length} de ${grupo.length} veículo(s): ${placas}`,
+    };
+  }
+
   const orgao = grupo[0].vehicle.account;
   const protocolo = montarProtocolo(grupo[0].id, grupo[0].createdAt);
 
@@ -422,6 +441,31 @@ export async function processRegistration(
   if (anexoDocumentoEspecifico) anexos.unshift(anexoDocumentoEspecifico);
   else if (anexoOficioPdf) anexos.unshift(anexoOficioPdf);
 
+  // Declaração de Instalação de TAG: sempre um SEGUNDO anexo, nunca no
+  // lugar do ofício/formulário -- o gate de semTag acima já garantiu que
+  // todo veículo do grupo tem TAG. Só falha aqui se a própria montagem do
+  // .docx quebrar (a conversão pra PDF já tem fallback dentro do gerador);
+  // nunca bloqueia um envio real por causa disso.
+  let anexoDeclaracaoTag: AnexoDocumento | null = null;
+  let documentoDeclaracaoTag: { buffer: Buffer; mimeType: string; extensao: string } | null = null;
+  try {
+    const declaracao = await gerarDeclaracaoTag(
+      dadosDoOficio.orgao,
+      veiculos.map(v => ({ plate: v.plate, renavam: v.renavam, marca: v.marca, modelo: v.modelo, tag: v.tag! })),
+      protocolo
+    );
+    anexoDeclaracaoTag = { fileName: declaracao.fileName, content: declaracao.buffer };
+    documentoDeclaracaoTag = {
+      buffer: declaracao.buffer,
+      mimeType: declaracao.mimeType,
+      extensao: declaracao.fileName.split('.').pop() ?? 'bin',
+    };
+    nomesAnexos.push(declaracao.fileName);
+  } catch (erro) {
+    console.error(`Falha ao gerar a declaração de TAG de ${orgao.name} (protocolo ${protocolo}):`, erro);
+  }
+  if (anexoDeclaracaoTag) anexos.push(anexoDeclaracaoTag);
+
   const { anexosEnviados } = await enviarOficioDeIsencao({
     destino: concessionaria.canalIsentos,
     remetente,
@@ -473,6 +517,20 @@ export async function processRegistration(
     console.error(`Falha ao arquivar o ofício de ${orgao.name} (protocolo ${protocolo}) no Blob:`, erro);
   }
 
+  let declaracaoTagUrl: string | null = null;
+  if (documentoDeclaracaoTag) {
+    try {
+      const blob = await put(
+        `declaracoes-tag/${orgao.id}/${protocolo}.${documentoDeclaracaoTag.extensao}`,
+        documentoDeclaracaoTag.buffer,
+        { access: 'private', addRandomSuffix: true, contentType: documentoDeclaracaoTag.mimeType }
+      );
+      declaracaoTagUrl = blob.pathname;
+    } catch (erro) {
+      console.error(`Falha ao arquivar a declaração de TAG de ${orgao.name} (protocolo ${protocolo}) no Blob:`, erro);
+    }
+  }
+
   // Só depois do envio confirmado, e para o grupo inteiro — o ofício cobre
   // todos, então todos passam a "enviado" juntos.
   await prisma.concesssionaireRegistration.updateMany({
@@ -486,6 +544,10 @@ export async function processRegistration(
         documentoTipo: documentoParaGravar.tipo,
         documentoOrigem: documentoParaGravar.origem,
         documentoGeradoEm: new Date(),
+      }),
+      ...(declaracaoTagUrl && {
+        declaracaoTagUrl,
+        declaracaoTagGeradaEm: new Date(),
       }),
     },
   });
