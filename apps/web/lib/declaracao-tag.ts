@@ -90,8 +90,7 @@ function tabelaFrota(veiculos: VeiculoParaDeclaracao[]): string {
 
 function montarCorpoDeclaracaoTagWordXml(
   orgao: OrgaoDoOficio,
-  veiculos: VeiculoParaDeclaracao[],
-  protocolo: string
+  veiculos: VeiculoParaDeclaracao[]
 ): string {
   const razao = orgao.razaoSocial || orgao.name;
   const localEmissao = orgao.cidadeEmissao || orgao.city;
@@ -111,9 +110,7 @@ function montarCorpoDeclaracaoTagWordXml(
     ) +
     tabelaFrota(veiculos) +
     p(run(`${localEmissao}, ${hoje}.`), ESPACO_DEPOIS(360)) +
-    assinaturaResponsavel(orgao) +
-    paragrafoVazio() +
-    p(run(`Protocolo ${protocolo} — Sistema Isenta`))
+    assinaturaResponsavel(orgao)
   );
 }
 
@@ -210,7 +207,6 @@ async function carregarTimbrePraImageRun(
 async function gerarDeclaracaoTagDoZero(
   orgao: OrgaoDoOficio,
   veiculos: VeiculoParaDeclaracao[],
-  protocolo: string,
   timbreUrl: string | null | undefined
 ): Promise<Buffer> {
   const nomeOrgao = orgao.razaoSocial || orgao.name;
@@ -286,11 +282,6 @@ async function gerarDeclaracaoTagDoZero(
           ...(orgao.responsibleRole
             ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(orgao.responsibleRole)] })]
             : []),
-          new Paragraph({ text: '' }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: `Protocolo ${protocolo} — Sistema Isenta`, size: 16, color: '888888' })],
-          }),
         ],
       },
     ],
@@ -320,7 +311,7 @@ export async function gerarDeclaracaoTag(
     const modelo = await carregarModeloOficio(modeloOficioUrl);
     if (modelo) {
       try {
-        const corpo = montarCorpoDeclaracaoTagWordXml(orgao, veiculos, protocolo);
+        const corpo = montarCorpoDeclaracaoTagWordXml(orgao, veiculos);
         docxBuffer = await montarDocumentoDocx(corpo, modelo);
       } catch (erro) {
         console.error(`Falha ao enxertar a declaração de TAG no timbre de ${nomeOrgao}, caindo pro modelo genérico:`, erro);
@@ -329,7 +320,7 @@ export async function gerarDeclaracaoTag(
   }
 
   if (!docxBuffer) {
-    docxBuffer = await gerarDeclaracaoTagDoZero(orgao, veiculos, protocolo, timbreUrl);
+    docxBuffer = await gerarDeclaracaoTagDoZero(orgao, veiculos, timbreUrl);
   }
 
   try {
