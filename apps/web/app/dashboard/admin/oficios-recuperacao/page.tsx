@@ -12,6 +12,7 @@ interface Resumo {
   naoEncontrados: number;
   ambiguos: number;
   erros: string[];
+  restamPendentes: boolean;
 }
 
 export default function RecuperacaoDeOficios() {
@@ -91,6 +92,14 @@ export default function RecuperacaoDeOficios() {
                 <p className="text-xs text-paper-dim">Ambíguos (mais de 1 achado)</p>
               </div>
             </div>
+
+            {resumo.restamPendentes && (
+              <div className="rounded border border-blue-500/40 bg-blue-500/10 p-3 text-sm text-blue-300">
+                Ainda há protocolos pendentes que não couberam nesta busca ({resumo.gruposTentados}{' '}
+                tentado{resumo.gruposTentados === 1 ? '' : 's'} desta vez) — clique em &quot;Buscar
+                documentos antigos agora&quot; de novo pra continuar de onde parou.
+              </div>
+            )}
 
             {resumo.erros.length > 0 && (
               <div className="rounded border border-red-500/50 bg-red-500/10 p-3 text-sm text-red-300">

@@ -19,7 +19,18 @@ export interface ResumoRecuperacao {
   naoEncontrados: number;
   ambiguos: number;
   erros: string[];
+  /** true quando ainda há protocolos pendentes que não couberam nesta execução -- clicar de novo continua de onde parou. */
+  restamPendentes: boolean;
 }
+
+// Cada protocolo é uma conexão IMAP nova (connect+login+search+fetch+logout),
+// alguns segundos cada -- mesma lição já aprendida no disparo nacional
+// (commit "Reduzir lote de processamento..."): um órgão com dezenas de
+// protocolos pendentes de uma vez estoura os 60s da rota mesmo com a caixa
+// respondendo rápido. Processa só um lote por clique; o que já foi
+// concluído (recuperado/não encontrado/ambíguo) fica marcado e não entra
+// de novo -- clicar "Buscar" outra vez continua a partir do que sobrou.
+const LIMITE_GRUPOS_POR_EXECUCAO = 5;
 
 interface MensagemEncontrada {
   uid: number;
@@ -126,18 +137,26 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
     naoEncontrados: 0,
     ambiguos: 0,
     erros: [],
+    restamPendentes: false,
   };
 
-  // Orçamento de tempo: a rota que chama isto tem maxDuration=60. Cada
-  // tentativa de conexão já tem seu próprio timeout curto (15s), mas com
-  // vários órgãos configurados a SOMA ainda podia estourar -- pára de
-  // começar órgãos novos perto do limite, deixando os restantes pra próxima
-  // vez que o admin clicar (não perde progresso, só não tenta tudo de uma vez).
+  // Orçamento de tempo -- rede de segurança além do limite de grupos acima.
+  // Pior caso por grupo: até 15s de busca + 15s de download de mensagem
+  // (os dois timeouts do relay) = ~30s. Parar de iniciar grupo novo em 20s
+  // deixa margem pro pior caso do grupo em andamento ainda caber nos 60s
+  // (maxDuration da rota), com folga pra Prisma/overhead.
   const inicio = Date.now();
-  const ORCAMENTO_MS = 45_000;
+  const ORCAMENTO_MS = 20_000;
 
-  for (const conta of contas) {
-    if (Date.now() - inicio > ORCAMENTO_MS) break;
+  contas: for (const conta of contas) {
+    if (resumo.gruposTentados >= LIMITE_GRUPOS_POR_EXECUCAO) {
+      resumo.restamPendentes = true;
+      break;
+    }
+    if (Date.now() - inicio > ORCAMENTO_MS) {
+      resumo.restamPendentes = true;
+      break;
+    }
 
     let credencial: CredencialSmtp;
     try {
@@ -175,6 +194,15 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
     log(`órgão ${conta.name}: ${grupos.size} protocolo(s) a tentar`);
 
     for (const [protocolo, grupo] of grupos) {
+      if (resumo.gruposTentados >= LIMITE_GRUPOS_POR_EXECUCAO) {
+        resumo.restamPendentes = true;
+        break contas;
+      }
+      if (Date.now() - inicio > ORCAMENTO_MS) {
+        resumo.restamPendentes = true;
+        break contas;
+      }
+
       resumo.gruposTentados++;
       log(`protocolo ${protocolo}: chamando /find-sent-messages`);
 
