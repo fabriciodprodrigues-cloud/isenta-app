@@ -438,6 +438,7 @@ export async function processRegistration(
         tagOperadora: r.vehicle.tags[0]!.operadora,
       })),
       protocolo,
+      orgao.modeloOficioUrl,
       orgao.timbreUrl
     );
     anexoDeclaracaoTag = { fileName: declaracao.fileName, content: declaracao.buffer };

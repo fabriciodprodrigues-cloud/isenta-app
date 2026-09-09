@@ -16,19 +16,24 @@ import {
 import type { OrgaoDoOficio } from './oficio-dados';
 import { enderecoCompleto } from './oficio-dados';
 import { converterParaPdf } from './email-service';
+import { montarDocumentoDocx, carregarModeloOficio } from './oficio-docx';
+import { p, run, RUN_NEGRITO, JUSTIFICADO, ESPACO_DEPOIS, paragrafoVazio, tabelaSimples } from './word-xml';
 
 /**
  * Declaração de Instalação de TAG -- anexo obrigatório em todo envio (ver
  * seção 4-A da especificação do módulo de modelos de documento), separado
  * do ofício/formulário da concessionária, nunca no lugar dele.
  *
- * Diferente dos outros documentos gerados no sistema (que enxertam um
- * corpo dentro do .docx de timbre de terceiro, via JSZip/WordprocessingML
- * cru -- ver oficio-docx.ts, artesp-documentos.ts): esta é montada do zero
- * com a lib `docx`, e usa o timbre do órgão (Account.timbreUrl, a mesma
- * imagem usada no HTML do ofício genérico) como uma imagem no topo, em vez
- * de enxertar num .docx de terceiro -- funciona mesmo pra órgão sem
- * modeloOficioUrl (a maioria), que é a maior parte dos casos.
+ * Duas técnicas, na ordem de preferência:
+ * 1. Órgão com `modeloOficioUrl` (timbre em .docx): enxerta o corpo no
+ *    mesmo timbre usado no ofício e no dossiê ARTESP, via
+ *    montarDocumentoDocx() -- padrão de fidelidade visual do resto do
+ *    sistema (brasão/cabeçalho reais, não uma imagem solta).
+ * 2. Sem modelo: monta do zero com a lib `docx`, tentando embutir
+ *    `Account.timbreUrl` (imagem solta) como fallback -- só funciona se
+ *    esse campo realmente apontar para uma imagem (confirmado nesta sessão
+ *    que pode estar dessincronizado; por isso é só o plano B, nunca a
+ *    primeira tentativa quando existe um modelo de verdade).
  */
 
 export interface VeiculoParaDeclaracao {
@@ -48,6 +53,72 @@ export interface DocumentoGerado {
   mimeType: string;
 }
 
+/** "07519786249 (Sem Parar)" -- mesma convenção já usada em artesp-documentos.ts pra combinar serial e operadora numa só coluna. */
+function tagComOperadora(v: VeiculoParaDeclaracao): string {
+  return v.tagOperadora ? `${v.tag} (${v.tagOperadora})` : v.tag;
+}
+
+// --- Técnica 1: enxerto no timbre real do órgão (WordprocessingML) ---
+
+function cabecalhoOrgao(orgao: OrgaoDoOficio): string {
+  const razao = orgao.razaoSocial || orgao.name;
+  return (
+    p(run(razao, RUN_NEGRITO)) +
+    p(run(`CNPJ ${orgao.cnpj}`)) +
+    p(run(enderecoCompleto(orgao)), ESPACO_DEPOIS(240))
+  );
+}
+
+function assinaturaResponsavel(orgao: OrgaoDoOficio): string {
+  return (
+    p(run(orgao.responsibleName, RUN_NEGRITO), ESPACO_DEPOIS(0)) +
+    p(run(orgao.responsibleRole || 'Responsável'))
+  );
+}
+
+function tabelaFrota(veiculos: VeiculoParaDeclaracao[]): string {
+  const cabecalho = ['Placa', 'Marca/Modelo', 'RENAVAM', 'TAG (operadora)'];
+  const larguras = [1600, 3200, 2000, 2600];
+  const linhas = veiculos.map(v => [
+    v.plate,
+    [v.marca, v.modelo].filter(Boolean).join(' ') || '—',
+    v.renavam,
+    tagComOperadora(v),
+  ]);
+  return tabelaSimples(cabecalho, larguras, linhas) + paragrafoVazio();
+}
+
+function montarCorpoDeclaracaoTagWordXml(
+  orgao: OrgaoDoOficio,
+  veiculos: VeiculoParaDeclaracao[],
+  protocolo: string
+): string {
+  const razao = orgao.razaoSocial || orgao.name;
+  const localEmissao = orgao.cidadeEmissao || orgao.city;
+  const hoje = new Date().toLocaleDateString('pt-BR');
+
+  return (
+    cabecalhoOrgao(orgao) +
+    p(run('DECLARAÇÃO DE INSTALAÇÃO DE TAG', RUN_NEGRITO), ESPACO_DEPOIS(240)) +
+    p(
+      run(
+        `A ${razao}, CNPJ nº ${orgao.cnpj}, declara, para os devidos fins junto à concessionária, ` +
+          `que a(s) TAG(s) relacionada(s) abaixo está(ão) corretamente instalada(s) no(s) ` +
+          `respectivo(s) veículo(s), e que pertence(m) à frota oficial do órgão, para fins de ` +
+          `isenção de pedágio.`
+      ),
+      JUSTIFICADO + ESPACO_DEPOIS(240)
+    ) +
+    tabelaFrota(veiculos) +
+    p(run(`${localEmissao}, ${hoje}.`), ESPACO_DEPOIS(360)) +
+    assinaturaResponsavel(orgao) +
+    paragrafoVazio() +
+    p(run(`Protocolo ${protocolo} — Sistema Isenta`))
+  );
+}
+
+// --- Técnica 2: montada do zero (sem timbre real disponível) ---
+
 const COR_TITULO = '1B4332';
 const COR_LINHA = '2D6A4F';
 
@@ -63,42 +134,30 @@ function celula(texto: string, cabecalho = false): TableCell {
   });
 }
 
-/** "07519786249 (Sem Parar)" -- mesma convenção já usada em artesp-documentos.ts pra combinar serial e operadora numa só coluna. */
-function tagComOperadora(v: VeiculoParaDeclaracao): string {
-  return v.tagOperadora ? `${v.tag} (${v.tagOperadora})` : v.tag;
-}
-
-/** Lê largura/altura de um PNG ou JPEG sem depender de nenhuma lib -- os dois formatos aceitos no upload do timbre (ver identidade/timbre/route.ts). */
 function lerDimensoesImagem(buffer: Buffer, tipo: 'png' | 'jpg'): { width: number; height: number } | null {
   try {
     if (tipo === 'png') {
-      // Assinatura PNG (8 bytes) + chunk IHDR: 4 bytes de tamanho + "IHDR" + largura(4) + altura(4).
       if (buffer.length < 24) return null;
       return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
     }
-
-    // JPEG: percorre os marcadores até achar um SOFn (início de frame), que
-    // guarda altura/largura logo após precisão (1 byte) no início do segmento.
-    let offset = 2; // pula o marcador SOI (0xFFD8)
+    let offset = 2;
     while (offset < buffer.length - 9) {
       if (buffer[offset] !== 0xff) {
         offset++;
         continue;
       }
       const marcador = buffer[offset + 1];
-      const eSOF =
-        marcador >= 0xc0 &&
-        marcador <= 0xcf &&
-        marcador !== 0xc4 &&
-        marcador !== 0xc8 &&
-        marcador !== 0xcc;
-
+      const eSOF = marcador >= 0xc0 && marcador <= 0xcf && marcador !== 0xc4 && marcador !== 0xc8 && marcador !== 0xcc;
       if (eSOF) {
-        const altura = buffer.readUInt16BE(offset + 5);
-        const largura = buffer.readUInt16BE(offset + 7);
-        return { width: largura, height: altura };
+        return { width: buffer.readUInt16BE(offset + 7), height: buffer.readUInt16BE(offset + 5) };
       }
-
+      // Marcadores sem campo de tamanho (SOI/EOI/RST/TEM) não têm o que pular
+      // por comprimento -- avança 2 bytes só, senão o parser desalinha e
+      // corre risco de ler lixo como um tamanho de segmento gigante.
+      if (marcador === 0xd8 || marcador === 0xd9 || (marcador >= 0xd0 && marcador <= 0xd7) || marcador === 0x01) {
+        offset += 2;
+        continue;
+      }
       const tamanhoSegmento = buffer.readUInt16BE(offset + 2);
       offset += 2 + tamanhoSegmento;
     }
@@ -108,7 +167,6 @@ function lerDimensoesImagem(buffer: Buffer, tipo: 'png' | 'jpg'): { width: numbe
   }
 }
 
-/** Baixa o timbre do órgão (mesma imagem do ofício genérico) e devolve pronto pra embutir no docx, já redimensionado. */
 async function carregarTimbrePraImageRun(
   timbreUrl: string | null | undefined
 ): Promise<{ data: Buffer; type: 'png' | 'jpg'; transformation: { width: number; height: number } } | null> {
@@ -124,18 +182,19 @@ async function carregarTimbrePraImageRun(
       : contentType.includes('jpeg') || contentType.includes('jpg')
         ? 'jpg'
         : null;
-    if (!tipo) return null;
+    // Campo pode apontar pra algo que não é imagem (já confirmado acontecer
+    // nesta sessão -- um timbreUrl dessincronizado apontando pra um .docx).
+    // Sem isso, o resto do gerador (técnica 2) segue sem timbre, igual a
+    // não ter nenhum -- nunca quebra o documento por causa disso.
+    if (!tipo) {
+      console.error(`timbreUrl não aponta para uma imagem válida (content-type: ${contentType || 'desconhecido'})`);
+      return null;
+    }
 
     const buffer = Buffer.from(await new Response(resultado.stream).arrayBuffer());
     const dimensoes = lerDimensoesImagem(buffer, tipo);
-
-    // Sem conseguir ler as dimensões reais, cai pra uma caixa fixa razoável
-    // em vez de não mostrar o timbre -- pode distorcer levemente, mas é
-    // melhor que omitir a identidade visual do órgão.
     const LARGURA_ALVO = 180;
-    const alturaProporcional = dimensoes
-      ? Math.round((dimensoes.height / dimensoes.width) * LARGURA_ALVO)
-      : 60;
+    const alturaProporcional = dimensoes ? Math.round((dimensoes.height / dimensoes.width) * LARGURA_ALVO) : 60;
 
     return {
       data: buffer,
@@ -148,13 +207,12 @@ async function carregarTimbrePraImageRun(
   }
 }
 
-/** Monta o .docx e tenta convertê-lo pra PDF -- nunca lança por causa da conversão, só devolve o .docx nesse caso. */
-export async function gerarDeclaracaoTag(
+async function gerarDeclaracaoTagDoZero(
   orgao: OrgaoDoOficio,
   veiculos: VeiculoParaDeclaracao[],
   protocolo: string,
-  timbreUrl?: string | null
-): Promise<DocumentoGerado> {
+  timbreUrl: string | null | undefined
+): Promise<Buffer> {
   const nomeOrgao = orgao.razaoSocial || orgao.name;
   const hoje = new Date().toLocaleDateString('pt-BR');
   const localEmissao = orgao.cidadeEmissao || orgao.city;
@@ -163,12 +221,7 @@ export async function gerarDeclaracaoTag(
   const linhasVeiculos = veiculos.map(
     v =>
       new TableRow({
-        children: [
-          celula(v.plate),
-          celula([v.marca, v.modelo].filter(Boolean).join(' ') || '—'),
-          celula(v.renavam),
-          celula(tagComOperadora(v)),
-        ],
+        children: [celula(v.plate), celula([v.marca, v.modelo].filter(Boolean).join(' ') || '—'), celula(v.renavam), celula(tagComOperadora(v))],
       })
   );
 
@@ -178,10 +231,7 @@ export async function gerarDeclaracaoTag(
         children: [
           ...(imagemTimbre
             ? [
-                new Paragraph({
-                  alignment: AlignmentType.CENTER,
-                  children: [new ImageRun(imagemTimbre)],
-                }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new ImageRun(imagemTimbre)] }),
                 new Paragraph({ text: '' }),
               ]
             : []),
@@ -191,18 +241,8 @@ export async function gerarDeclaracaoTag(
             children: [new TextRun({ text: 'DECLARAÇÃO DE INSTALAÇÃO DE TAG', bold: true, color: COR_TITULO, size: 28 })],
           }),
           new Paragraph({ text: '' }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Órgão: ', bold: true }),
-              new TextRun(`${nomeOrgao} — CNPJ ${orgao.cnpj}`),
-            ],
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: 'Endereço: ', bold: true }),
-              new TextRun(enderecoCompleto(orgao)),
-            ],
-          }),
+          new Paragraph({ children: [new TextRun({ text: 'Órgão: ', bold: true }), new TextRun(`${nomeOrgao} — CNPJ ${orgao.cnpj}`)] }),
+          new Paragraph({ children: [new TextRun({ text: 'Endereço: ', bold: true }), new TextRun(enderecoCompleto(orgao))] }),
           new Paragraph({
             children: [
               new TextRun({ text: 'Responsável: ', bold: true }),
@@ -242,10 +282,7 @@ export async function gerarDeclaracaoTag(
           new Paragraph({ text: '' }),
           new Paragraph({ text: '' }),
           new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun('_'.repeat(40))] }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: orgao.responsibleName, bold: true })],
-          }),
+          new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: orgao.responsibleName, bold: true })] }),
           ...(orgao.responsibleRole
             ? [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun(orgao.responsibleRole)] })]
             : []),
@@ -259,15 +296,46 @@ export async function gerarDeclaracaoTag(
     ],
   });
 
-  const docxBuffer = await Packer.toBuffer(doc);
+  return Packer.toBuffer(doc);
+}
+
+/**
+ * Monta o documento (enxertado no timbre real se `modeloOficioUrl` existir,
+ * senão do zero) e tenta convertê-lo pra PDF -- nunca lança por causa da
+ * conversão, só devolve o .docx nesse caso.
+ */
+export async function gerarDeclaracaoTag(
+  orgao: OrgaoDoOficio,
+  veiculos: VeiculoParaDeclaracao[],
+  protocolo: string,
+  modeloOficioUrl?: string | null,
+  timbreUrl?: string | null
+): Promise<DocumentoGerado> {
+  const nomeOrgao = orgao.razaoSocial || orgao.name;
   const nomeBase = `Declaracao TAG - ${nomeOrgao}`;
+
+  let docxBuffer: Buffer | null = null;
+
+  if (modeloOficioUrl) {
+    const modelo = await carregarModeloOficio(modeloOficioUrl);
+    if (modelo) {
+      try {
+        const corpo = montarCorpoDeclaracaoTagWordXml(orgao, veiculos, protocolo);
+        docxBuffer = await montarDocumentoDocx(corpo, modelo);
+      } catch (erro) {
+        console.error(`Falha ao enxertar a declaração de TAG no timbre de ${nomeOrgao}, caindo pro modelo genérico:`, erro);
+      }
+    }
+  }
+
+  if (!docxBuffer) {
+    docxBuffer = await gerarDeclaracaoTagDoZero(orgao, veiculos, protocolo, timbreUrl);
+  }
 
   try {
     const pdf = await converterParaPdf(docxBuffer, 'docx');
     return { buffer: pdf, fileName: `${nomeBase}.pdf`, mimeType: 'application/pdf' };
   } catch (erro) {
-    // Falha de rede/relay não pode travar um envio real -- devolve o .docx,
-    // que já é um documento válido e assinável, em vez do PDF.
     console.error('Falha ao converter a declaração de TAG para PDF, anexando .docx:', erro);
     return {
       buffer: docxBuffer,

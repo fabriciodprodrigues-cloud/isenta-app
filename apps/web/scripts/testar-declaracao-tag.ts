@@ -11,9 +11,9 @@ import { gerarDeclaracaoTag } from '../lib/declaracao-tag';
 import { dadosDeExemploParaModelo } from '../lib/dados-exemplo';
 
 async function main() {
-  // Timbre real opcional via argv[2], pra testar o embutimento da imagem --
-  // sem isso, gera sem timbre (caso mais comum, órgão sem modeloOficioUrl).
-  const timbreUrl = process.argv[2];
+  // modeloOficioUrl (timbre .docx) opcional via argv[2], pra testar o
+  // enxerto no timbre real -- sem isso, gera do zero sem timbre.
+  const modeloOficioUrl = process.argv[2];
 
   const resultado = await gerarDeclaracaoTag(
     dadosDeExemploParaModelo.orgao,
@@ -26,7 +26,7 @@ async function main() {
       tagOperadora: i % 2 === 0 ? 'Sem Parar' : 'ConectCar',
     })),
     dadosDeExemploParaModelo.protocolo,
-    timbreUrl
+    modeloOficioUrl
   );
 
   await writeFile(`declaracao-tag-teste.${resultado.fileName.split('.').pop()}`, resultado.buffer);

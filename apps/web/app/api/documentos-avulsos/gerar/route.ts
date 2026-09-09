@@ -97,6 +97,7 @@ export async function POST(request: NextRequest) {
           tagOperadora: v.tags[0]!.operadora,
         })),
         protocolo,
+        conta.modeloOficioUrl,
         conta.timbreUrl
       );
       return devolverArquivo(documento.buffer, documento.fileName, documento.mimeType);
