@@ -24,6 +24,8 @@ interface Registration {
   protocol: string | null;
   sentAt: string | null;
   approvedAt: string | null;
+  documentoUrl: string | null;
+  documentoOrigem: string | null;
   concessionaire: {
     id: string;
     name: string;
@@ -317,8 +319,18 @@ export default function ConcessionariasPage() {
                             Marcar como aprovado
                           </Button>
                         )}
-                        {(reg.status === 'aprovado' || reg.status === 'recusado') && (
+                        {(reg.status === 'aprovado' || reg.status === 'recusado') && !reg.documentoUrl && (
                           <span className="text-paper-dim text-xs">—</span>
+                        )}
+                        {reg.documentoUrl && (
+                          <a
+                            href={`/api/registrations/${reg.id}/documento`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-xs text-green hover:underline"
+                          >
+                            Ver ofício{reg.documentoOrigem === 'recuperado_imap' ? ' (recuperado)' : ''}
+                          </a>
                         )}
                       </TableCell>
                     </TableRow>

@@ -15,6 +15,8 @@ interface Cadastro {
   sentAt: string | null;
   approvedAt: string | null;
   rejectionReason: string | null;
+  documentoUrl: string | null;
+  documentoOrigem: string | null;
   vehicle: { plate: string; account: { name: string } | null } | null;
   concessionaire: { name: string } | null;
 }
@@ -150,6 +152,7 @@ export default function CentralCadastros() {
                     <TableCell>Status</TableCell>
                     <TableCell>Protocolo</TableCell>
                     <TableCell>Criado</TableCell>
+                    <TableCell>Documento</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -179,6 +182,20 @@ export default function CentralCadastros() {
                       </TableCell>
                       <TableCell className="text-sm text-paper-dim">
                         {format_date(new Date(c.createdAt))}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {c.documentoUrl ? (
+                          <a
+                            href={`/api/registrations/${c.id}/documento`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-green hover:underline"
+                          >
+                            Ver{c.documentoOrigem === 'recuperado_imap' ? ' (recuperado)' : ''}
+                          </a>
+                        ) : (
+                          <span className="text-paper-dim">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

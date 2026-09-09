@@ -122,6 +122,21 @@ interface CorpoEnvio {
 }
 
 /**
+ * Nomes comuns da pasta de Enviados quando o servidor não expõe a flag
+ * especial \Sent (ver uso em copiarParaEnviados e em /find-sent-messages,
+ * que reaproveita esta mesma lista para achar a pasta antes de buscar
+ * mensagens antigas nela).
+ */
+const CANDIDATOS_PASTA_ENVIADOS = [
+  'Sent',
+  'Enviados',
+  'INBOX.Sent',
+  'INBOX/Sent',
+  'Sent Items',
+  '[Gmail]/Sent Mail',
+];
+
+/**
  * Envio por SMTP puro (não pelo webmail) não deixa cópia em Enviados por
  * conta própria -- nenhum provedor observado até agora faz isso sozinho.
  * Melhor esforço, best-effort: conecta por IMAP, acha a pasta certa (via
@@ -152,15 +167,9 @@ async function copiarParaEnviados(params: {
 
     const pastas = await client.list();
     const pastaEspecial = pastas.find(p => p.specialUse === '\\Sent');
-    const candidatos = [
-      pastaEspecial?.path,
-      'Sent',
-      'Enviados',
-      'INBOX.Sent',
-      'INBOX/Sent',
-      'Sent Items',
-      '[Gmail]/Sent Mail',
-    ].filter((p): p is string => Boolean(p));
+    const candidatos = [pastaEspecial?.path, ...CANDIDATOS_PASTA_ENVIADOS].filter(
+      (p): p is string => Boolean(p)
+    );
 
     for (const caminho of candidatos) {
       try {
@@ -528,6 +537,240 @@ app.post('/check-emails', exigirSegredo, async (req: Request<{}, {}, CorpoLeitur
       await client.logout();
     } catch {
       // conexão já pode ter caído — nada a fazer
+    }
+  }
+});
+
+interface CorpoBuscaEnviados {
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  password?: string;
+  /** ISO -- obrigatório: nunca varrer a pasta inteira sem limite. */
+  desde?: string;
+  ate?: string;
+  limite?: number;
+  limiteBytesCorpo?: number;
+}
+
+/** Conecta e resolve a pasta de Enviados (flag \Sent, senão os nomes comuns) -- devolve null se nenhuma existir. */
+async function resolverPastaEnviados(client: ImapFlow): Promise<string | null> {
+  const pastas = await client.list();
+  const pastaEspecial = pastas.find(p => p.specialUse === '\\Sent');
+  if (pastaEspecial) return pastaEspecial.path;
+
+  for (const candidato of CANDIDATOS_PASTA_ENVIADOS) {
+    if (pastas.some(p => p.path === candidato)) return candidato;
+  }
+  return null;
+}
+
+/**
+ * Busca mensagens na pasta Enviados dentro de uma janela de datas --
+ * recuperação de ofícios antigos (best-effort), não o fluxo de leitura de
+ * respostas (que é /check-emails, sobre INBOX). `desde` é obrigatório de
+ * propósito: sem uma janela, uma caixa grande vira uma varredura cara e
+ * lenta a cada tentativa.
+ */
+app.post('/find-sent-messages', exigirSegredo, async (req: Request<{}, {}, CorpoBuscaEnviados>, res: Response) => {
+  const { host, port: portaImap, secure, user, password, desde, ate, limite, limiteBytesCorpo } =
+    req.body ?? {};
+
+  if (!host || !user || !password || !desde) {
+    res.status(400).json({ erro: 'Campos obrigatórios: host, user, password, desde.' });
+    return;
+  }
+
+  const client = new ImapFlow({
+    host,
+    port: Number(portaImap) || 993,
+    secure: secure === undefined ? true : Boolean(secure),
+    auth: { user, pass: password },
+    logger: false,
+  });
+  client.on('error', erro => console.error('Erro de conexão IMAP (busca em Enviados):', erro));
+
+  try {
+    await client.connect();
+
+    const pasta = await resolverPastaEnviados(client);
+    if (!pasta) {
+      // Nenhuma pasta de Enviados nesta caixa -- resultado legítimo, não erro.
+      await client.logout();
+      res.status(200).json({ pastaEncontrada: null, mensagens: [] });
+      return;
+    }
+
+    await client.mailboxOpen(pasta, { readOnly: true });
+
+    const criterio: Record<string, unknown> = { since: new Date(desde) };
+    if (ate) criterio.before = new Date(ate);
+
+    const uids = await client.search(criterio, { uid: true });
+    const limitados = (uids || []).slice(0, Math.min(Number(limite) || 20, 50));
+
+    const mensagens: Array<{
+      uid: number;
+      de: string;
+      assunto: string;
+      data: string | null;
+      corpo: string | null;
+    }> = [];
+
+    for (const uid of limitados) {
+      const msg = await client.fetchOne(String(uid), { envelope: true, uid: true, bodyStructure: true }, { uid: true });
+      if (!msg) continue;
+
+      let corpo: string | null = null;
+      const parte = encontrarParteTexto(msg.bodyStructure);
+      if (parte) {
+        try {
+          const baixado = await client.download(msg.uid, parte.part, {
+            uid: true,
+            maxBytes: limiteBytesCorpo ?? 20_000,
+          });
+          const bruto = await streamParaString(baixado.content);
+          corpo = parte.tipo === 'text/html' ? bruto.replace(/<[^>]+>/g, ' ') : bruto;
+        } catch {
+          // segue sem corpo
+        }
+      }
+
+      mensagens.push({
+        uid: msg.uid,
+        de: msg.envelope?.from?.[0]?.address ?? '',
+        assunto: msg.envelope?.subject ?? '',
+        data: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : null,
+        corpo,
+      });
+    }
+
+    await client.logout();
+    res.status(200).json({ pastaEncontrada: pasta, mensagens });
+  } catch (erro) {
+    console.error('Erro ao buscar em Enviados:', erro);
+    res.status(502).json({
+      erro: 'Falha ao buscar em Enviados',
+      detalhe: erro instanceof Error ? erro.message : String(erro),
+    });
+    try {
+      await client.logout();
+    } catch {
+      // conexão já pode ter caído
+    }
+  }
+});
+
+interface CorpoBuscarAnexos {
+  host?: string;
+  port?: number;
+  secure?: boolean;
+  user?: string;
+  password?: string;
+  /** Pasta e uid vêm de um resultado anterior de /find-sent-messages. */
+  pasta?: string;
+  uid?: number;
+  limiteBytesPorAnexo?: number;
+}
+
+/** Percorre a bodyStructure coletando nós que são anexo (disposition=attachment, ou tem filename mesmo sem disposition). */
+function coletarNosDeAnexo(struct: any, acumulado: any[] = []): any[] {
+  if (!struct) return acumulado;
+
+  const temNomeDeArquivo = Boolean(struct.dispositionParameters?.filename || struct.parameters?.name);
+  if (struct.disposition === 'attachment' || (temNomeDeArquivo && struct.disposition !== 'inline')) {
+    acumulado.push(struct);
+  }
+
+  if (struct.childNodes) {
+    for (const filho of struct.childNodes) coletarNosDeAnexo(filho, acumulado);
+  }
+  return acumulado;
+}
+
+/**
+ * Baixa uma mensagem específica (achada antes via /find-sent-messages) --
+ * seus anexos, ou o corpo texto/html quando não há nenhum (cobre o caso
+ * histórico "só HTML", de antes do documento binário existir).
+ */
+app.post('/fetch-sent-message', exigirSegredo, async (req: Request<{}, {}, CorpoBuscarAnexos>, res: Response) => {
+  const { host, port: portaImap, secure, user, password, pasta, uid, limiteBytesPorAnexo } =
+    req.body ?? {};
+
+  if (!host || !user || !password || !pasta || !uid) {
+    res.status(400).json({ erro: 'Campos obrigatórios: host, user, password, pasta, uid.' });
+    return;
+  }
+
+  const client = new ImapFlow({
+    host,
+    port: Number(portaImap) || 993,
+    secure: secure === undefined ? true : Boolean(secure),
+    auth: { user, pass: password },
+    logger: false,
+  });
+  client.on('error', erro => console.error('Erro de conexão IMAP (fetch de mensagem):', erro));
+
+  try {
+    await client.connect();
+    await client.mailboxOpen(pasta, { readOnly: true });
+
+    const msg = await client.fetchOne(String(uid), { bodyStructure: true }, { uid: true });
+    if (!msg) {
+      await client.logout();
+      res.status(404).json({ erro: 'Mensagem não encontrada' });
+      return;
+    }
+
+    const nosDeAnexo = coletarNosDeAnexo(msg.bodyStructure);
+    const anexos: Array<{ filename: string; contentBase64: string; contentType: string }> = [];
+
+    for (const no of nosDeAnexo) {
+      try {
+        const baixado = await client.download(uid, no.part, {
+          uid: true,
+          maxBytes: limiteBytesPorAnexo ?? 15_000_000,
+        });
+        const pedacos: Buffer[] = [];
+        for await (const pedaco of baixado.content) {
+          pedacos.push(Buffer.isBuffer(pedaco) ? pedaco : Buffer.from(pedaco));
+        }
+        anexos.push({
+          filename: no.dispositionParameters?.filename || no.parameters?.name || `anexo-${no.part}`,
+          contentBase64: Buffer.concat(pedacos).toString('base64'),
+          contentType: no.type && no.subtype ? `${no.type}/${no.subtype}` : 'application/octet-stream',
+        });
+      } catch (erro) {
+        console.error(`Falha ao baixar anexo (part ${no.part}) da mensagem ${uid}:`, erro);
+      }
+    }
+
+    let corpoHtml: string | undefined;
+    if (anexos.length === 0) {
+      const parte = encontrarParteTexto(msg.bodyStructure);
+      if (parte) {
+        try {
+          const baixado = await client.download(uid, parte.part, { uid: true });
+          corpoHtml = await streamParaString(baixado.content);
+        } catch {
+          // segue sem corpo -- resposta final decide "não encontrado"
+        }
+      }
+    }
+
+    await client.logout();
+    res.status(200).json({ anexos, corpoHtml });
+  } catch (erro) {
+    console.error('Erro ao buscar mensagem:', erro);
+    res.status(502).json({
+      erro: 'Falha ao buscar mensagem',
+      detalhe: erro instanceof Error ? erro.message : String(erro),
+    });
+    try {
+      await client.logout();
+    } catch {
+      // conexão já pode ter caído
     }
   }
 });

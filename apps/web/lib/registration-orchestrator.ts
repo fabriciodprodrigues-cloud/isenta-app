@@ -1,4 +1,4 @@
-import { get } from '@vercel/blob';
+import { get, put } from '@vercel/blob';
 import { prisma } from './prisma';
 import {
   enviarOficioDeIsencao,
@@ -6,6 +6,7 @@ import {
   type AnexoDocumento,
 } from './email-service';
 import type { VeiculoDoOficio, DadosDoOficio } from './oficio-isencao';
+import { montarOficio } from './oficio-isencao';
 import { montarOficioDocx } from './oficio-docx';
 import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
 import { abrir, type CredencialSmtp } from './cofre';
@@ -362,6 +363,10 @@ export async function processRegistration(
   // não bate) nunca bloqueia o envio -- cai pro caminho antigo, mesma
   // filosofia já usada pro modeloOficioUrl do órgão.
   let anexoDocumentoEspecifico: AnexoDocumento | null = null;
+  // Descartado ao montar anexoDocumentoEspecifico acima (só fileName+content
+  // sobrevivem) -- capturado à parte porque o arquivamento (mais abaixo)
+  // precisa do content-type real, não de um "application/octet-stream" genérico.
+  let mimeTipoDocumentoEspecifico: string | null = null;
 
   if (concessionaria.modeloDocumento?.arquivoUrl) {
     const modeloBuffer = await carregarModeloOficio(concessionaria.modeloDocumento.arquivoUrl);
@@ -382,6 +387,7 @@ export async function processRegistration(
           arquivoBuffer: modeloBuffer,
         });
         anexoDocumentoEspecifico = { fileName: documento.fileName, content: documento.buffer };
+        mimeTipoDocumentoEspecifico = documento.mimeType;
         nomesAnexos.unshift(documento.fileName);
       } catch (erro) {
         console.error(`Falha ao gerar documento específico de ${concessionaria.name}:`, erro);
@@ -424,11 +430,64 @@ export async function processRegistration(
     dados: dadosDoOficio,
   });
 
+  // Arquiva o que foi de fato enviado -- o binário gerado, se houver, senão
+  // o próprio HTML que foi pro corpo do e-mail (montarOficio() é puro e
+  // barato, recomputar aqui não exige mudar o retorno de
+  // enviarOficioDeIsencao). Nunca bloqueia nem atrasa a confirmação do
+  // envio: o e-mail já saiu de verdade via SMTP neste ponto.
+  const documentoParaArquivar = anexoDocumentoEspecifico
+    ? {
+        buffer: anexoDocumentoEspecifico.content as Buffer,
+        mimeType: mimeTipoDocumentoEspecifico ?? 'application/octet-stream',
+        extensao: anexoDocumentoEspecifico.fileName.split('.').pop() ?? 'bin',
+        origem: 'gerado',
+      }
+    : anexoOficioPdf
+      ? {
+          buffer: anexoOficioPdf.content as Buffer,
+          mimeType: 'application/pdf',
+          extensao: 'pdf',
+          origem: 'gerado',
+        }
+      : {
+          buffer: Buffer.from(montarOficio(dadosDoOficio).html, 'utf8'),
+          mimeType: 'text/html',
+          extensao: 'html',
+          origem: 'html_arquivado',
+        };
+
+  let documentoParaGravar: { url: string; tipo: string; origem: string } | null = null;
+  try {
+    const caminho = `oficios/${orgao.id}/${protocolo}.${documentoParaArquivar.extensao}`;
+    const blob = await put(caminho, documentoParaArquivar.buffer, {
+      access: 'private',
+      addRandomSuffix: true,
+      contentType: documentoParaArquivar.mimeType,
+    });
+    documentoParaGravar = {
+      url: blob.pathname,
+      tipo: documentoParaArquivar.mimeType,
+      origem: documentoParaArquivar.origem,
+    };
+  } catch (erro) {
+    console.error(`Falha ao arquivar o ofício de ${orgao.name} (protocolo ${protocolo}) no Blob:`, erro);
+  }
+
   // Só depois do envio confirmado, e para o grupo inteiro — o ofício cobre
   // todos, então todos passam a "enviado" juntos.
   await prisma.concesssionaireRegistration.updateMany({
     where: { id: { in: grupo.map(r => r.id) } },
-    data: { status: 'enviado', sentAt: new Date(), protocol: protocolo },
+    data: {
+      status: 'enviado',
+      sentAt: new Date(),
+      protocol: protocolo,
+      ...(documentoParaGravar && {
+        documentoUrl: documentoParaGravar.url,
+        documentoTipo: documentoParaGravar.tipo,
+        documentoOrigem: documentoParaGravar.origem,
+        documentoGeradoEm: new Date(),
+      }),
+    },
   });
 
   return {

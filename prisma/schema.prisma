@@ -259,6 +259,19 @@ model ConcesssionaireRegistration {
   approvedAt        DateTime?
   rejectionReason   String?
 
+  // --- Documento efetivamente enviado ---
+  // O ofício/documento é gerado na hora do envio e, sem isto, some depois
+  // (só o e-mail em si carrega o anexo). Arquivado no Blob a partir desta
+  // sessão -- ver processRegistration() em registration-orchestrator.ts.
+  documentoUrl                  String?   // pathname no Blob privado
+  documentoTipo                 String?   // mime type
+  documentoOrigem                String?   // gerado | html_arquivado | recuperado_imap
+  documentoGeradoEm             DateTime?
+  /// null = nunca tentado; preenchido só depois de uma tentativa real de
+  /// busca no IMAP (nunca por falha de conexão -- ver recuperacao-oficios.ts).
+  documentoRecuperacaoStatus    String?   // nao_encontrado | ambiguo | recuperado
+  documentoRecuperacaoTentadoEm DateTime?
+
   // --- Execução pelo robô de portal ---
   /// Quantas vezes o robô já tentou. Serve para desistir depois de N falhas
   /// em vez de repetir indefinidamente contra um portal que mudou.

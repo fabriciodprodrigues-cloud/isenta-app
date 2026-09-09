@@ -39,7 +39,16 @@ export default async function VehicleDetailsPage({
     },
   });
 
-  if (!vehicle) {
+  // Mesma regra corrigida em api/vehicles/[id]/route.ts: esta página consulta
+  // o Prisma direto (não passa pela API), então precisa da mesma checagem --
+  // sem isso, um operador acessando a URL de um veículo de outro órgão via
+  // navegador recebia a página inteira renderizada, inclusive o link de
+  // editar -- este redirect corta isso antes de qualquer dado ser lido.
+  if (
+    !vehicle ||
+    ((session.user as any)?.role === 'operator' &&
+      vehicle.accountId !== (session.user as any)?.accountId)
+  ) {
     redirect('/dashboard/vehicles');
   }
 
@@ -188,6 +197,16 @@ export default async function VehicleDetailsPage({
                     <p className="text-sm text-slate">
                       {reg.protocol && `Protocolo: ${reg.protocol}`}
                     </p>
+                    {reg.documentoUrl && (
+                      <a
+                        href={`/api/registrations/${reg.id}/documento`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-green hover:underline"
+                      >
+                        Ver ofício{reg.documentoOrigem === 'recuperado_imap' ? ' (recuperado)' : ''}
+                      </a>
+                    )}
                   </div>
                   <Badge
                     variant={
