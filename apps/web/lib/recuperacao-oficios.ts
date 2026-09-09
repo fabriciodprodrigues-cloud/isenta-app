@@ -109,10 +109,15 @@ async function baixarMensagem(
 
 /** Verifica todos os órgãos com IMAP configurado, tentando recuperar documentos de solicitações já enviadas sem arquivo. */
 export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecuperacao> {
+  const inicioTudo = Date.now();
+  const log = (msg: string) => console.log(`[recuperacao-oficios +${Date.now() - inicioTudo}ms] ${msg}`);
+
+  log('início');
   const contas = await prisma.account.findMany({
     where: { emailCredencialCifrada: { not: null } },
     select: { id: true, name: true, emailCredencialCifrada: true },
   });
+  log(`contas com credencial: ${contas.length}`);
 
   const resumo: ResumoRecuperacao = {
     orgaosVerificados: 0,
@@ -143,6 +148,7 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
     if (!credencial.imapHost) continue; // sem leitura configurada, nada a buscar
 
     resumo.orgaosVerificados++;
+    log(`órgão ${conta.name}: IMAP configurado, buscando pendentes`);
 
     // Pendentes: já enviadas (protocol/sentAt preenchidos), sem documento
     // arquivado, e nunca tentadas antes -- uma tentativa concluída (achou
@@ -157,6 +163,7 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
       },
       select: { id: true, protocol: true, sentAt: true },
     });
+    log(`órgão ${conta.name}: ${pendentes.length} solicitações pendentes de recuperação`);
 
     const grupos = new Map<string, { sentAt: Date; ids: string[] }>();
     for (const r of pendentes) {
@@ -165,9 +172,11 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
       if (existente) existente.ids.push(r.id);
       else grupos.set(r.protocol, { sentAt: r.sentAt, ids: [r.id] });
     }
+    log(`órgão ${conta.name}: ${grupos.size} protocolo(s) a tentar`);
 
     for (const [protocolo, grupo] of grupos) {
       resumo.gruposTentados++;
+      log(`protocolo ${protocolo}: chamando /find-sent-messages`);
 
       // A busca em si (conexão IMAP) é isolada do resto: uma falha aqui
       // quase certo significa que a mesma caixa vai falhar pra TODO grupo
@@ -181,7 +190,9 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
         const desde = new Date(grupo.sentAt.getTime() - 24 * 60 * 60 * 1000);
         const ate = new Date(grupo.sentAt.getTime() + 3 * 24 * 60 * 60 * 1000);
         resultadoBusca = await buscarNaCaixaDoOrgao(credencial, desde, ate);
+        log(`protocolo ${protocolo}: /find-sent-messages respondeu (pasta=${resultadoBusca.pastaEncontrada ?? 'nenhuma'})`);
       } catch (erro) {
+        log(`protocolo ${protocolo}: /find-sent-messages falhou -- ${erro instanceof Error ? erro.message : String(erro)}`);
         resumo.erros.push(
           `${conta.name}: ${erro instanceof Error ? erro.message : String(erro)}`
         );
@@ -259,6 +270,8 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
       }
     }
   }
+
+  log(`fim -- resumo: ${JSON.stringify(resumo)}`);
 
   return resumo;
 }

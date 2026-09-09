@@ -588,6 +588,12 @@ app.post('/find-sent-messages', exigirSegredo, async (req: Request<{}, {}, Corpo
     secure: secure === undefined ? true : Boolean(secure),
     auth: { user, pass: password },
     logger: false,
+    // Padrão do ImapFlow é 90s pra conectar -- longo demais pra uma feature
+    // melhor-esforço em segundo plano, e o abort do lado de quem chama
+    // (apps/web) não avisa o ImapFlow aqui a parar de tentar. Falha rápido
+    // de propósito: 10s pra conectar, 8s pro greeting do servidor.
+    connectionTimeout: 10_000,
+    greetingTimeout: 8_000,
   });
   client.on('error', erro => console.error('Erro de conexão IMAP (busca em Enviados):', erro));
 
@@ -709,6 +715,8 @@ app.post('/fetch-sent-message', exigirSegredo, async (req: Request<{}, {}, Corpo
     secure: secure === undefined ? true : Boolean(secure),
     auth: { user, pass: password },
     logger: false,
+    connectionTimeout: 10_000,
+    greetingTimeout: 8_000,
   });
   client.on('error', erro => console.error('Erro de conexão IMAP (fetch de mensagem):', erro));
 
