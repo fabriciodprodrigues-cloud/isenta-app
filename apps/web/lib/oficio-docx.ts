@@ -1,6 +1,31 @@
 import JSZip from 'jszip';
+import { get } from '@vercel/blob';
 import { montarCorpoOficioWordXml } from './oficio-docx-corpo';
 import type { DadosDoOficio } from './oficio-dados';
+
+/**
+ * Carrega o modelo de ofício (.docx) do órgão, como buffer bruto — sem
+ * conversão nenhuma, quem usa (montarOficioDocx) é quem sabe manipular XML.
+ *
+ * Vive aqui (não em registration-orchestrator.ts, que a tinha originalmente)
+ * pra evitar import circular: tanto o orquestrador de envio quanto
+ * oficio-generico.ts (gerador avulso) e o módulo ARTESP precisam dela.
+ */
+export async function carregarModeloOficio(pathname: string): Promise<Buffer | null> {
+  try {
+    const resultado = await get(pathname, { access: 'private' });
+
+    if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
+      console.error(`Modelo de ofício indisponível no Blob: ${pathname}`);
+      return null;
+    }
+
+    return Buffer.from(await new Response(resultado.stream).arrayBuffer());
+  } catch (erro) {
+    console.error('Falha ao carregar o modelo de ofício:', erro);
+    return null;
+  }
+}
 
 /**
  * Gera o .docx final do ofício, enxertando o corpo gerado programaticamente

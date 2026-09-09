@@ -116,6 +116,18 @@ export function Sidebar() {
             </div>
           </Link>
 
+          <Link href="/dashboard/documentos-avulsos">
+            <div
+              className={`rounded-lg px-4 py-2 transition-colors ${
+                isActive('/dashboard/documentos-avulsos')
+                  ? 'bg-ink-700 text-green'
+                  : 'text-slate hover:text-paper hover:bg-ink-700/50'
+              }`}
+            >
+              Gerar Documento
+            </div>
+          </Link>
+
         </nav>
       </aside>
     );

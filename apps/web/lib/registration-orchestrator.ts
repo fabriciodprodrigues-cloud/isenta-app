@@ -2,17 +2,17 @@ import { get, put } from '@vercel/blob';
 import { prisma } from './prisma';
 import {
   enviarOficioDeIsencao,
-  converterDocxParaPdf,
   type AnexoDocumento,
 } from './email-service';
 import type { VeiculoDoOficio, DadosDoOficio } from './oficio-isencao';
 import { montarOficio } from './oficio-isencao';
-import { montarOficioDocx } from './oficio-docx';
+import { carregarModeloOficio } from './oficio-docx';
 import { avaliarIdentidadeEnvio, type Pendencia } from './identidade-envio';
 import { abrir, type CredencialSmtp } from './cofre';
 import { gerarDocumentoConcessionaria } from './modelo-documento';
 import type { DadosParaModelo } from './modelo-documento-tipos';
 import { gerarDeclaracaoTag } from './declaracao-tag';
+import { gerarOficioGenerico } from './oficio-generico';
 
 /**
  * Resultado do envio de um ofício.
@@ -77,26 +77,6 @@ async function carregarTimbre(pathname: string): Promise<string | null> {
     return `data:${tipo};base64,${buffer.toString('base64')}`;
   } catch (erro) {
     console.error('Falha ao carregar o papel timbrado:', erro);
-    return null;
-  }
-}
-
-/**
- * Carrega o modelo de ofício (.docx) do órgão, como buffer bruto — sem
- * conversão nenhuma, quem usa (montarOficioDocx) é quem sabe manipular XML.
- */
-export async function carregarModeloOficio(pathname: string): Promise<Buffer | null> {
-  try {
-    const resultado = await get(pathname, { access: 'private' });
-
-    if (!resultado || resultado.statusCode !== 200 || !resultado.stream) {
-      console.error(`Modelo de ofício indisponível no Blob: ${pathname}`);
-      return null;
-    }
-
-    return Buffer.from(await new Response(resultado.stream).arrayBuffer());
-  } catch (erro) {
-    console.error('Falha ao carregar o modelo de ofício:', erro);
     return null;
   }
 }
@@ -421,20 +401,18 @@ export async function processRegistration(
   // por causa disso.
   let anexoOficioPdf: AnexoDocumento | null = null;
 
-  if (!anexoDocumentoEspecifico && orgao.modeloOficioUrl) {
-    const modelo = await carregarModeloOficio(orgao.modeloOficioUrl);
-    if (modelo) {
-      try {
-        const docx = await montarOficioDocx(dadosDoOficio, modelo);
-        const pdf = await converterDocxParaPdf(docx);
-        const nomeArquivo = `Oficio ${numeroOficio.replace('/', '-')} - ${orgao.name}.pdf`;
-        anexoOficioPdf = { fileName: nomeArquivo, content: pdf };
-        // Entra na lista só agora — o corpo do PDF (montado acima) não deve
-        // se listar como o próprio anexo.
-        nomesAnexos.unshift(nomeArquivo);
-      } catch (erro) {
-        console.error(`Falha ao gerar PDF do ofício para ${orgao.name}:`, erro);
-      }
+  if (!anexoDocumentoEspecifico) {
+    const oficio = await gerarOficioGenerico(
+      dadosDoOficio,
+      orgao.modeloOficioUrl,
+      numeroOficio,
+      orgao.name
+    );
+    if (oficio.kind === 'pdf') {
+      anexoOficioPdf = { fileName: oficio.fileName, content: oficio.buffer };
+      // Entra na lista só agora — o corpo do PDF (montado acima) não deve
+      // se listar como o próprio anexo.
+      nomesAnexos.unshift(oficio.fileName);
     }
   }
 
