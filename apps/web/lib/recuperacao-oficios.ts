@@ -149,10 +149,27 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
     for (const [protocolo, grupo] of grupos) {
       resumo.gruposTentados++;
 
+      // A busca em si (conexão IMAP) é isolada do resto: uma falha aqui
+      // quase certo significa que a mesma caixa vai falhar pra TODO grupo
+      // seguinte deste órgão -- sem o break, um órgão com dezenas de
+      // protocolos pendentes e a caixa fora do ar tentava a mesma conexão
+      // quebrada uma vez por protocolo (até 45s cada), estourando os 60s de
+      // limite da função na Vercel e derrubando a requisição inteira com
+      // timeout ("Falha de conexão" genérico na tela, sem nenhum resumo).
+      let resultadoBusca: { pastaEncontrada: string | null; mensagens: Awaited<ReturnType<typeof buscarNaCaixaDoOrgao>>['mensagens'] };
       try {
         const desde = new Date(grupo.sentAt.getTime() - 24 * 60 * 60 * 1000);
         const ate = new Date(grupo.sentAt.getTime() + 3 * 24 * 60 * 60 * 1000);
-        const { pastaEncontrada, mensagens } = await buscarNaCaixaDoOrgao(credencial, desde, ate);
+        resultadoBusca = await buscarNaCaixaDoOrgao(credencial, desde, ate);
+      } catch (erro) {
+        resumo.erros.push(
+          `${conta.name}: ${erro instanceof Error ? erro.message : String(erro)}`
+        );
+        break; // não adianta tentar os próximos grupos deste mesmo órgão
+      }
+
+      try {
+        const { pastaEncontrada, mensagens } = resultadoBusca;
 
         if (!pastaEncontrada) {
           await marcarTentativa(grupo.ids, 'nao_encontrado');
@@ -214,8 +231,8 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
         });
         resumo.recuperados++;
       } catch (erro) {
-        // Falha de conexão/transporte NUNCA vira "não encontrado" -- fica
-        // elegível pra nova tentativa quando a caixa voltar a funcionar.
+        // Falha depois da busca (baixar a mensagem, gravar no Blob) -- fica
+        // elegível pra nova tentativa, nunca vira "não encontrado" por engano.
         resumo.erros.push(
           `${conta.name} (protocolo ${protocolo}): ${erro instanceof Error ? erro.message : String(erro)}`
         );
