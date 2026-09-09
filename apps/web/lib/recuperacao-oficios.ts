@@ -52,7 +52,12 @@ async function buscarNaCaixaDoOrgao(
       desde: desde.toISOString(),
       ate: ate.toISOString(),
     }),
-    signal: AbortSignal.timeout(45_000),
+    // Mais curto que o timeout usado na leitura de respostas (45s): aquele
+    // fluxo importa de verdade e vale esperar; este é melhor-esforço em
+    // segundo plano, então falhar rápido é melhor UX (e essencial pra caber
+    // dentro do maxDuration=60 da rota mesmo com mais de um órgão na fila --
+    // ver o orçamento de tempo em recuperarDocumentosDeTodosOsOrgaos()).
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!resposta.ok) {
@@ -86,7 +91,12 @@ async function baixarMensagem(
       pasta,
       uid,
     }),
-    signal: AbortSignal.timeout(45_000),
+    // Mais curto que o timeout usado na leitura de respostas (45s): aquele
+    // fluxo importa de verdade e vale esperar; este é melhor-esforço em
+    // segundo plano, então falhar rápido é melhor UX (e essencial pra caber
+    // dentro do maxDuration=60 da rota mesmo com mais de um órgão na fila --
+    // ver o orçamento de tempo em recuperarDocumentosDeTodosOsOrgaos()).
+    signal: AbortSignal.timeout(15_000),
   });
 
   if (!resposta.ok) {
@@ -113,7 +123,17 @@ export async function recuperarDocumentosDeTodosOsOrgaos(): Promise<ResumoRecupe
     erros: [],
   };
 
+  // Orçamento de tempo: a rota que chama isto tem maxDuration=60. Cada
+  // tentativa de conexão já tem seu próprio timeout curto (15s), mas com
+  // vários órgãos configurados a SOMA ainda podia estourar -- pára de
+  // começar órgãos novos perto do limite, deixando os restantes pra próxima
+  // vez que o admin clicar (não perde progresso, só não tenta tudo de uma vez).
+  const inicio = Date.now();
+  const ORCAMENTO_MS = 45_000;
+
   for (const conta of contas) {
+    if (Date.now() - inicio > ORCAMENTO_MS) break;
+
     let credencial: CredencialSmtp;
     try {
       credencial = abrir<CredencialSmtp>(conta.emailCredencialCifrada!);
