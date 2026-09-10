@@ -118,7 +118,7 @@ export default function ModeloDocumentoConcessionaria() {
     return null;
   }
 
-  function mudarTipo(novoTipo: Tipo) {
+  async function mudarTipo(novoTipo: Tipo) {
     if (novoTipo === tipo) return;
     const temConfig = arquivoUrl || Object.keys(camposDocx).length > 0 || Object.keys(camposXlsx).length > 0;
     if (temConfig) {
@@ -127,11 +127,36 @@ export default function ModeloDocumentoConcessionaria() {
       );
       if (!confirmar) return;
     }
-    setTipo(novoTipo);
+
+    setErro('');
+    setAviso('');
     setCamposDocx({});
     setCamposXlsx({});
     setLinhaInicial(1);
     setColunasVeiculo({});
+
+    // Salva o tipo na hora, não só no estado local -- sem isso, o upload
+    // (seção 2, antes do botão "Salvar mapeamento" na seção 4) falhava com
+    // "escolha o tipo primeiro" mesmo já tendo escolhido no seletor, porque
+    // o servidor só saberia do tipo novo depois de salvar o mapeamento.
+    setSalvando(true);
+    try {
+      const resposta = await fetch(`/api/concessionarias/${id}/modelo`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: novoTipo, mapeamentoCampos: mapeamentoVazio(novoTipo) }),
+      });
+      if (!resposta.ok) {
+        const corpo = await resposta.json().catch(() => null);
+        setErro(corpo?.error ?? 'Não foi possível trocar o tipo.');
+        return;
+      }
+      setTipo(novoTipo);
+    } catch {
+      setErro('Falha de conexão ao trocar o tipo.');
+    } finally {
+      setSalvando(false);
+    }
   }
 
   async function salvarConfig() {
@@ -305,6 +330,7 @@ export default function ModeloDocumentoConcessionaria() {
           <select
             value={tipo}
             onChange={e => mudarTipo(e.target.value as Tipo)}
+            disabled={salvando}
             className="w-full max-w-xs rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
           >
             <option value="GENERICO">Genérico (ofício padrão da Isenta)</option>
