@@ -161,8 +161,8 @@ async function main() {
     'mapeou as 4 colunas de veículo reconhecidas nas letras certas'
   );
   checar(
-    deteccaoXlsx.avisos.some(a => a.includes('4 de 10')),
-    'avisou que só 4 de 10 colunas de veículo foram reconhecidas'
+    deteccaoXlsx.avisos.some(a => a.includes('4 de 11')),
+    'avisou que só 4 de 11 colunas de veículo foram reconhecidas'
   );
 
   console.log(falhas === 0 ? '\nTudo certo.' : `\n${falhas} verificação(ões) falharam.`);

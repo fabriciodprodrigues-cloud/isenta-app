@@ -172,6 +172,7 @@ function lerCelulasDaLinha(linhaXml: string, sharedStrings: string[]): CelulaLid
 const SINONIMOS_CAMPO_ORGAO: Record<(typeof CAMPOS_ORGAO_CONHECIDOS)[number], string[]> = {
   responsavelNome: ['nome do responsavel', 'responsavel', 'representante legal', 'representante'],
   responsavelCpf: ['cpf do responsavel', 'cpf'],
+  responsavelCargo: ['cargo ou funcao', 'cargo', 'funcao', 'cargo do responsavel'],
   orgaoNome: ['nome do orgao', 'orgao', 'instituicao', 'razao social', 'empresa'],
   orgaoCnpj: ['cnpj do orgao', 'cnpj'],
   orgaoEndereco: ['endereco', 'endereco completo', 'endereco fisico', 'logradouro'],
@@ -187,16 +188,69 @@ const SINONIMOS_CAMPO_VEICULO: Record<(typeof CAMPOS_VEICULO_CONHECIDOS)[number]
   ano: ['ano', 'ano modelo', 'ano fabricacao'],
   placa: ['placa'],
   renavam: ['renavam', 'codigo renavam'],
-  tipo: ['tipo', 'tipo de veiculo', 'proprio/locado'],
+  // "tipo do veiculo" (com "do", não só "de") é a frase completa mais comum
+  // em formulários reais (ex.: Rota Verde) -- sem ela, o sinônimo curto
+  // "veiculo" (de dentro do campo `veiculo`, marca+modelo combinados) batia
+  // por substring nessa mesma célula primeiro, roubando a coluna de `tipo`.
+  tipo: ['tipo', 'tipo de veiculo', 'tipo do veiculo', 'proprio/locado'],
   cor: ['cor'],
   cnpjCpf: ['cnpj/cpf', 'cpf/cnpj', 'documento'],
   observacao: ['observacao', 'obs'],
+  data: ['data'],
 };
 
+/** Remove pontuação (mantém letras/números/espaço) pra "CNPJ /CPF" e "cnpj/cpf" caírem na mesma chave de comparação. */
+function chaveComparacao(normalizado: string): string {
+  return normalizado.replace(/[/\-.,:;()]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function correspondeCelula(sinonimos: string[], normalizado: string): 'exato' | 'parcial' | null {
-  if (sinonimos.includes(normalizado)) return 'exato';
-  if (sinonimos.some(s => normalizado.includes(s) || s.includes(normalizado))) return 'parcial';
+  const alvo = chaveComparacao(normalizado);
+  // Célula em branco não "corresponde" a nada -- sem essa guarda, o fallback
+  // por substring caía numa armadilha boba: toda string (inclusive "")
+  // contém a string vazia, então uma célula vazia "batia" por substring com
+  // QUALQUER sinônimo, e era erroneamente tratada como se já fosse um
+  // rótulo conhecido (impedindo que ela fosse escolhida como célula-valor).
+  if (!alvo) return null;
+  const lista = sinonimos.map(chaveComparacao);
+  if (lista.includes(alvo)) return 'exato';
+  if (lista.some(s => alvo.includes(s) || s.includes(alvo))) return 'parcial';
   return null;
+}
+
+interface RetanguloMesclado {
+  colIni: number;
+  colFim: number;
+  linIni: number;
+  linFim: number;
+}
+
+/** `<mergeCells>` fica como irmão de `<sheetData>`, por isso recebe o sheetXml inteiro, não só o trecho de dentro de <sheetData>. */
+function extrairMesclagens(sheetXml: string): RetanguloMesclado[] {
+  const secao = sheetXml.match(/<mergeCells\b[^>]*>([\s\S]*?)<\/mergeCells>/);
+  if (!secao) return [];
+  const refs = Array.from(secao[1].matchAll(/<mergeCell\s+ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g));
+  return refs.map(([, colIniL, linIniS, colFimL, linFimS]) => ({
+    colIni: indiceColuna(colIniL),
+    colFim: indiceColuna(colFimL),
+    linIni: Number(linIniS),
+    linFim: Number(linFimS),
+  }));
+}
+
+function mesclagemDaCelula(mesclagens: RetanguloMesclado[], coluna: number, linha: number): RetanguloMesclado | null {
+  return mesclagens.find(m => coluna >= m.colIni && coluna <= m.colFim && linha >= m.linIni && linha <= m.linFim) ?? null;
+}
+
+function letraDeIndice(indice: number): string {
+  let letra = '';
+  let n = indice;
+  while (n > 0) {
+    const resto = (n - 1) % 26;
+    letra = String.fromCharCode(65 + resto) + letra;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letra;
 }
 
 export async function detectarCamposXlsx(buffer: Buffer): Promise<DeteccaoXlsx> {
@@ -222,6 +276,7 @@ export async function detectarCamposXlsx(buffer: Buffer): Promise<DeteccaoXlsx> 
   const sheetDataXml = sheetXml.slice(inicioSheetData + '<sheetData>'.length, fimSheetData);
 
   const sharedStrings = await extrairSharedStrings(zip);
+  const mesclagens = extrairMesclagens(sheetXml);
   const linhas = extrairLinhas(sheetDataXml);
   if (linhas.length === 0) {
     throw new ModeloXlsxInvalidoError('nenhuma <row> encontrada em <sheetData> -- planilha vazia ou formato inesperado');
@@ -237,52 +292,12 @@ export async function detectarCamposXlsx(buffer: Buffer): Promise<DeteccaoXlsx> 
 
   const avisos: string[] = [];
 
-  // -- Campos de nível-órgão --------------------------------------------
-  const sugestoesCampos: Record<string, string> = {};
-  for (const campo of CAMPOS_ORGAO_CONHECIDOS) {
-    const sinonimos = SINONIMOS_CAMPO_ORGAO[campo];
-    // Prioriza correspondência exata; só recorre a substring (confiança
-    // menor, ex.: "Assinatura do responsável" batendo com o sinônimo curto
-    // "responsavel") se não houve nenhuma exata -- mesma tiebreak de
-    // detectarCamposDocx.
-    const exatas = todasCelulas.filter(c => c.texto && correspondeCelula(sinonimos, c.normalizado) === 'exato');
-    const candidatas =
-      exatas.length > 0 ? exatas : todasCelulas.filter(c => c.texto && correspondeCelula(sinonimos, c.normalizado) === 'parcial');
-    if (candidatas.length === 0) continue;
-
-    let rotulo = candidatas[0];
-    if (candidatas.length > 1) {
-      candidatas.sort((a, b) => a.linha - b.linha || indiceColuna(a.coluna) - indiceColuna(b.coluna));
-      rotulo = candidatas[0];
-      avisos.push(`Mais de uma célula parece ser o rótulo de "${campo}" -- usada a de menor posição (${rotulo.ref}), confira.`);
-    }
-
-    const celulasLinha = (celulasPorLinha.get(rotulo.linha) ?? []).sort(
-      (a, b) => indiceColuna(a.coluna) - indiceColuna(b.coluna)
-    );
-    const indiceRotulo = celulasLinha.findIndex(c => c.ref === rotulo.ref);
-
-    // 1) próxima célula ocupada na mesma linha à direita, se não for outro rótulo conhecido.
-    let valor = celulasLinha
-      .slice(indiceRotulo + 1)
-      .find(c => c.texto && !correspondeCelula(sinonimos, c.normalizado) && !ehRotuloConhecido(c.normalizado));
-
-    // 2) senão, próxima célula ocupada abaixo, mesma coluna.
-    if (!valor) {
-      const colunaRotulo = rotulo.coluna;
-      valor = todasCelulas
-        .filter(c => c.coluna === colunaRotulo && c.linha > rotulo.linha && c.texto)
-        .sort((a, b) => a.linha - b.linha)[0];
-    }
-
-    if (valor) {
-      sugestoesCampos[campo] = valor.ref;
-    } else {
-      avisos.push(`Rótulo de "${campo}" encontrado (${rotulo.ref}), mas nenhuma célula de valor próxima -- preencha manualmente.`);
-    }
-  }
-
-  // -- Tabela de veículos --------------------------------------------------
+  // -- Tabela de veículos ---------------------------------------------------
+  // Detectada ANTES dos campos de órgão de propósito: sem saber onde fica o
+  // cabeçalho da tabela, um rótulo comum de coluna (ex.: "DATA", "CNPJ
+  // /CPF") era confundido com um campo de nível-órgão, e o valor "adivinhado"
+  // caía dentro da própria tabela (ex.: a data de hoje sendo escrita em cima
+  // do cabeçalho "Placa") -- bug real encontrado no arquivo da Rota Verde.
   let melhorLinha: { numero: number; matches: Record<string, string> } | null = null;
   for (const linha of linhas) {
     const celulas = celulasPorLinha.get(linha.numero) ?? [];
@@ -320,6 +335,85 @@ export async function detectarCamposXlsx(buffer: Buffer): Promise<DeteccaoXlsx> 
     }
   } else {
     avisos.push('Não foi possível identificar automaticamente o cabeçalho da tabela de veículos -- preencha manualmente.');
+  }
+
+  // -- Campos de nível-órgão -------------------------------------------
+  // Exclui a linha de cabeçalho da tabela (e tudo dela pra baixo) da busca
+  // de rótulo/valor -- sem isso, "DATA" ou "CNPJ /CPF" no cabeçalho da
+  // tabela de veículos eram lidos como se fossem um campo de órgão solto,
+  // e o valor "adivinhado" acabava dentro da própria tabela.
+  const linhaCabecalhoVeiculos = melhorLinha?.numero ?? null;
+  const celulasForaDaTabela = todasCelulas.filter(
+    c => linhaCabecalhoVeiculos === null || c.linha < linhaCabecalhoVeiculos
+  );
+
+  const sugestoesCampos: Record<string, string> = {};
+  for (const campo of CAMPOS_ORGAO_CONHECIDOS) {
+    const sinonimos = SINONIMOS_CAMPO_ORGAO[campo];
+    // Prioriza correspondência exata; só recorre a substring (confiança
+    // menor, ex.: "Assinatura do responsável" batendo com o sinônimo curto
+    // "responsavel") se não houve nenhuma exata -- mesma tiebreak de
+    // detectarCamposDocx.
+    const exatas = celulasForaDaTabela.filter(c => c.texto && correspondeCelula(sinonimos, c.normalizado) === 'exato');
+    const candidatas =
+      exatas.length > 0
+        ? exatas
+        : celulasForaDaTabela.filter(c => c.texto && correspondeCelula(sinonimos, c.normalizado) === 'parcial');
+    if (candidatas.length === 0) continue;
+
+    let rotulo = candidatas[0];
+    if (candidatas.length > 1) {
+      candidatas.sort((a, b) => a.linha - b.linha || indiceColuna(a.coluna) - indiceColuna(b.coluna));
+      rotulo = candidatas[0];
+      avisos.push(`Mais de uma célula parece ser o rótulo de "${campo}" -- usada a de menor posição (${rotulo.ref}), confira.`);
+    }
+
+    const celulasLinha = celulasPorLinha.get(rotulo.linha) ?? [];
+    const colunaRotuloIdx = indiceColuna(rotulo.coluna);
+
+    // Em vez de procurar a primeira célula com TEXTO à direita, olhamos a
+    // posição logo após o rótulo -- num modelo em branco (o caso comum: um
+    // formulário recém-enviado, nunca preenchido), a célula-valor não tem
+    // texto nenhum ainda, então exigir texto fazia o algoritmo pular direto
+    // pra célula errada, às vezes do outro lado da planilha (bug real
+    // encontrado no arquivo da Rota Verde). "Logo após o rótulo" considera a
+    // mesclagem do próprio rótulo (ex.: rótulo mesclado C3:D3 -> valor
+    // começa em E, não em D, que é só a continuação do rótulo).
+    const mesclagemRotulo = mesclagemDaCelula(mesclagens, colunaRotuloIdx, rotulo.linha);
+    const colunaAposRotulo = (mesclagemRotulo?.colFim ?? colunaRotuloIdx) + 1;
+
+    // 1) se há uma mesclagem começando bem ali, o valor é a âncora dela
+    // (única célula da mesclagem que de fato guarda conteúdo).
+    let valorRef: string | null = null;
+    const mesclagemValor = mesclagens.find(
+      m => m.colIni === colunaAposRotulo && m.linIni <= rotulo.linha && m.linFim >= rotulo.linha
+    );
+    if (mesclagemValor) {
+      valorRef = `${letraDeIndice(mesclagemValor.colIni)}${rotulo.linha}`;
+    } else {
+      // 2) sem mesclagem: célula isolada logo após o rótulo, contanto que
+      // não seja ela mesma outro rótulo conhecido (funciona com ou sem
+      // texto -- uma célula em branco não é "conhecida", passa a valer).
+      const candidata = celulasLinha.find(c => indiceColuna(c.coluna) === colunaAposRotulo);
+      if (!candidata || !ehRotuloConhecido(candidata.normalizado)) {
+        valorRef = `${letraDeIndice(colunaAposRotulo)}${rotulo.linha}`;
+      }
+    }
+
+    // 3) por último, próxima célula abaixo na mesma coluna do rótulo (layout rótulo-em-cima) -- também sem entrar na tabela de veículos.
+    if (!valorRef) {
+      const abaixo = celulasForaDaTabela
+        .filter(c => c.coluna === rotulo.coluna && c.linha > rotulo.linha)
+        .sort((a, b) => a.linha - b.linha)
+        .find(c => !ehRotuloConhecido(c.normalizado));
+      if (abaixo) valorRef = abaixo.ref;
+    }
+
+    if (valorRef) {
+      sugestoesCampos[campo] = valorRef;
+    } else {
+      avisos.push(`Rótulo de "${campo}" encontrado (${rotulo.ref}), mas nenhuma célula de valor próxima -- preencha manualmente.`);
+    }
   }
 
   return { sugestoesCampos, sugestaoTabela, avisos };

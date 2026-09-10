@@ -23,6 +23,7 @@ interface ModeloConfig {
 const ROTULO_CAMPO_ORGAO: Record<string, string> = {
   responsavelNome: 'Nome do responsável',
   responsavelCpf: 'CPF do responsável',
+  responsavelCargo: 'Cargo ou função do responsável',
   orgaoNome: 'Instituição / nome do órgão',
   orgaoCnpj: 'CNPJ do órgão',
   orgaoEndereco: 'Endereço',
@@ -42,6 +43,7 @@ const ROTULO_CAMPO_VEICULO: Record<string, string> = {
   cor: 'Cor',
   cnpjCpf: 'CNPJ/CPF',
   observacao: 'Observação',
+  data: 'Data (repetida em cada linha)',
 };
 
 function mapeamentoVazio(tipo: Tipo) {
@@ -564,7 +566,7 @@ export default function ModeloDocumentoConcessionaria() {
                         <input
                           type="text"
                           value={camposXlsx[campo] ?? ''}
-                          onChange={e => setCamposXlsx({ ...camposXlsx, [campo]: e.target.value.toUpperCase() })}
+                          onChange={e => setCamposXlsx({ ...camposXlsx, [campo]: e.target.value.toUpperCase().trim() })}
                           placeholder="ex: B4"
                           className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
                         />
@@ -591,7 +593,7 @@ export default function ModeloDocumentoConcessionaria() {
                             type="text"
                             value={colunasVeiculo[campo] ?? ''}
                             onChange={e =>
-                              setColunasVeiculo({ ...colunasVeiculo, [campo]: e.target.value.toUpperCase() })
+                              setColunasVeiculo({ ...colunasVeiculo, [campo]: e.target.value.toUpperCase().trim() })
                             }
                             placeholder="coluna, ex: B"
                             className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"

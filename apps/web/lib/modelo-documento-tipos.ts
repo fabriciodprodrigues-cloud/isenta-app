@@ -50,6 +50,8 @@ export interface MapeamentoCamposXlsx {
 export const CAMPOS_ORGAO_CONHECIDOS = [
   'responsavelNome',
   'responsavelCpf',
+  /** Cargo/função do responsável (ex.: "Presidente da Câmara") -- já existe como Account.responsibleRole, usado no ofício genérico. */
+  'responsavelCargo',
   'orgaoNome',
   'orgaoCnpj',
   'orgaoEndereco',
@@ -75,4 +77,6 @@ export const CAMPOS_VEICULO_CONHECIDOS = [
   'cor',
   'cnpjCpf',
   'observacao',
+  /** Data repetida por linha -- alguns formulários (ex.: Rota Verde) têm uma coluna "DATA" própria da tabela de veículos, além (ou em vez) de um campo de órgão único. */
+  'data',
 ] as const;

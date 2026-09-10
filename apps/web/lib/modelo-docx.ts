@@ -23,6 +23,8 @@ function montarValorCampo(chave: string, dados: DadosParaModelo): string {
       return dados.orgao.responsibleName;
     case 'responsavelCpf':
       return ''; // não modelado em OrgaoDoOficio hoje -- fica em branco até existir a fonte real
+    case 'responsavelCargo':
+      return dados.orgao.responsibleRole ?? '';
     case 'orgaoNome':
       return dados.orgao.razaoSocial || dados.orgao.name;
     case 'orgaoCnpj':
@@ -95,6 +97,7 @@ export async function gerarDocumentoDocx(
     cor: v.cor ?? '',
     cnpjCpf: dados.orgao.cnpj,
     observacao: '',
+    data: dados.dataAtual.toLocaleDateString('pt-BR'),
   }));
 
   try {

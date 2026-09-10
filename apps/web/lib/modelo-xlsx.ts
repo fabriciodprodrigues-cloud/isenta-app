@@ -63,8 +63,15 @@ function renumerarLinha(xml: string, novoNumero: number): string {
  */
 function definirCelula(linhaXml: string, coluna: string, numeroLinha: number, valor: string): string {
   const ref = `${coluna}${numeroLinha}`;
+  // Quantificadores PREGUIÇOSOS (`*?`), não gulosos: uma célula vazia real
+  // (a maioria num modelo em branco) é auto-fechada (`<c r="X".../>`), sem
+  // nenhum "</c>" próprio. Com `[^>]*` guloso, o trecho antes da alternativa
+  // podia "comer" o "/" de "/>", forçando a alternativa ">...</c>" a
+  // escanear pra frente até achar o PRÓXIMO "</c>" de alguma célula
+  // distante -- e o replace() então apagava tudo no meio. Bug real
+  // encontrado no arquivo da Rota Verde (o "Excel reparou o arquivo").
   const regexCelula = new RegExp(
-    `<c\\b[^>]*\\br="${ref}"[^>]*(?:/>|>[\\s\\S]*?</c>)`
+    `<c\\b[^>]*?\\br="${ref}"[^>]*?(?:/>|>[\\s\\S]*?</c>)`
   );
   const existente = linhaXml.match(regexCelula);
   const valorEscapado = escaparXml(valor);
@@ -93,6 +100,8 @@ function montarValorCampo(chave: string, dados: DadosParaModelo): string {
       return dados.orgao.responsibleName;
     case 'responsavelCpf':
       return '';
+    case 'responsavelCargo':
+      return dados.orgao.responsibleRole ?? '';
     case 'orgaoNome':
       return dados.orgao.razaoSocial || dados.orgao.name;
     case 'orgaoCnpj':
@@ -132,6 +141,8 @@ function valorColunaVeiculo(chave: string, veiculo: DadosParaModelo['veiculos'][
       return dados.orgao.cnpj;
     case 'observacao':
       return '';
+    case 'data':
+      return dados.dataAtual.toLocaleDateString('pt-BR');
     default:
       return '';
   }
@@ -204,6 +215,12 @@ export async function gerarDocumentoXlsx(
     let xml = renumerarLinha(linhaModelo.xml, numeroNovaLinha);
     for (const [chave, coluna] of Object.entries(colunas)) {
       if (!coluna) continue;
+      // Referência malformada (ex.: espaço/tab colado por engano na tela de
+      // mapeamento) gera uma célula com endereço inválido no XML -- Excel
+      // abre "reparando" o arquivo silenciosamente em vez de avisar o admin.
+      if (!/^[A-Z]+$/.test(coluna)) {
+        throw new ModeloXlsxInvalidoError(`referência de coluna inválida para "${chave}": "${coluna}"`);
+      }
       xml = definirCelula(xml, coluna, numeroNovaLinha, valorColunaVeiculo(chave, veiculo, dados));
     }
     return { numero: numeroNovaLinha, xml };
