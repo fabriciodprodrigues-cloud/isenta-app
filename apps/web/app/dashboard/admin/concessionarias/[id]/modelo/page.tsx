@@ -62,6 +62,13 @@ export default function ModeloDocumentoConcessionaria() {
   const [enviandoArquivo, setEnviandoArquivo] = useState(false);
   const [prevendo, setPrevendo] = useState(false);
   const [ativando, setAtivando] = useState(false);
+  const [detectando, setDetectando] = useState(false);
+  // null = ainda não detectou neste arquivo -> tags do DOCX continuam como
+  // texto livre. Depois de detectar, vira a lista real de tags achadas no
+  // arquivo, e os campos passam a usar <select> restrito a elas.
+  const [tagsDocxDetectadas, setTagsDocxDetectadas] = useState<string[] | null>(null);
+  const [camposDocxTextoLivre, setCamposDocxTextoLivre] = useState<Set<string>>(new Set());
+  const [avisosDeteccao, setAvisosDeteccao] = useState<string[]>([]);
 
   const [tipo, setTipo] = useState<Tipo>('GENERICO');
   const [arquivoUrl, setArquivoUrl] = useState<string | null>(null);
@@ -134,6 +141,9 @@ export default function ModeloDocumentoConcessionaria() {
     setCamposXlsx({});
     setLinhaInicial(1);
     setColunasVeiculo({});
+    setTagsDocxDetectadas(null);
+    setCamposDocxTextoLivre(new Set());
+    setAvisosDeteccao([]);
 
     // Salva o tipo na hora, não só no estado local -- sem isso, o upload
     // (seção 2, antes do botão "Salvar mapeamento" na seção 4) falhava com
@@ -192,6 +202,11 @@ export default function ModeloDocumentoConcessionaria() {
     setErro('');
     setAviso('');
     setEnviandoArquivo(true);
+    // Arquivo novo invalida a detecção anterior (tags/sugestões eram do
+    // arquivo antigo) -- volta pro modo texto livre até detectar de novo.
+    setTagsDocxDetectadas(null);
+    setCamposDocxTextoLivre(new Set());
+    setAvisosDeteccao([]);
     try {
       const dados = new FormData();
       dados.append('file', arquivo);
@@ -254,6 +269,69 @@ export default function ModeloDocumentoConcessionaria() {
     }
   }
 
+  async function detectarAutomaticamente() {
+    setErro('');
+    setAviso('');
+    setAvisosDeteccao([]);
+    setDetectando(true);
+    try {
+      const resposta = await fetch(`/api/concessionarias/${id}/modelo/detectar`, { method: 'POST' });
+      const corpo = await resposta.json().catch(() => null);
+      if (!resposta.ok) {
+        setErro(corpo?.error ?? 'Não foi possível detectar os campos automaticamente.');
+        return;
+      }
+
+      if (tipo === 'DOCX') {
+        const { tagsEncontradas, sugestoesCampos } = corpo as {
+          tagsEncontradas: string[];
+          sugestoesCampos: Record<string, string>;
+        };
+        setTagsDocxDetectadas(tagsEncontradas);
+        // Mescla só nos campos ainda vazios -- reclicar não perde o que o
+        // admin já digitou manualmente depois de uma primeira detecção.
+        setCamposDocx(atual => {
+          const mesclado = { ...atual };
+          for (const [campo, tag] of Object.entries(sugestoesCampos)) {
+            if (!mesclado[campo]) mesclado[campo] = tag;
+          }
+          return mesclado;
+        });
+        const quantidade = Object.keys(sugestoesCampos).length;
+        setAvisosDeteccao([`${quantidade} de ${CAMPOS_ORGAO_CONHECIDOS.length} campos detectados a partir de ${tagsEncontradas.length} tags encontradas no arquivo.`]);
+      } else {
+        const { sugestoesCampos, sugestaoTabela, avisos } = corpo as {
+          sugestoesCampos: Record<string, string>;
+          sugestaoTabela: { linhaInicial: number; colunas: Record<string, string> } | null;
+          avisos: string[];
+        };
+        setCamposXlsx(atual => {
+          const mesclado = { ...atual };
+          for (const [campo, referencia] of Object.entries(sugestoesCampos)) {
+            if (!mesclado[campo]) mesclado[campo] = referencia;
+          }
+          return mesclado;
+        });
+        if (sugestaoTabela) {
+          setLinhaInicial(atual => (atual === 1 ? sugestaoTabela.linhaInicial : atual));
+          setColunasVeiculo(atual => {
+            const mesclado = { ...atual };
+            for (const [campo, coluna] of Object.entries(sugestaoTabela.colunas)) {
+              if (!mesclado[campo]) mesclado[campo] = coluna;
+            }
+            return mesclado;
+          });
+        }
+        setAvisosDeteccao(avisos);
+      }
+      setAviso('Sugestões aplicadas nos campos vazios — confira antes de salvar.');
+    } catch {
+      setErro('Falha de conexão ao detectar os campos.');
+    } finally {
+      setDetectando(false);
+    }
+  }
+
   async function ativar() {
     setErro('');
     setAviso('');
@@ -286,6 +364,18 @@ export default function ModeloDocumentoConcessionaria() {
     } finally {
       setAtivando(false);
     }
+  }
+
+  // Campo usa <select> restrito às tags achadas no arquivo quando: já
+  // detectou neste arquivo, o admin não pediu "Outra tag" pra ele, e o valor
+  // atual está vazio ou é uma das tags achadas (config antiga com uma tag que
+  // o scan não achou continua editável como texto, sem forçar select).
+  function usaSelectDocx(campo: string): boolean {
+    return (
+      tagsDocxDetectadas !== null &&
+      !camposDocxTextoLivre.has(campo) &&
+      (!camposDocx[campo] || tagsDocxDetectadas.includes(camposDocx[campo]))
+    );
   }
 
   const preRequisitosFaltando: string[] = [];
@@ -395,25 +485,64 @@ export default function ModeloDocumentoConcessionaria() {
           <Card>
             <CardHeader><h2 className="font-semibold text-paper">4. Mapeamento de campos</h2></CardHeader>
             <CardBody className="space-y-4">
+              <div>
+                <Button
+                  variant="secondary"
+                  onClick={detectarAutomaticamente}
+                  disabled={detectando || !arquivoUrl}
+                  size="sm"
+                >
+                  {detectando ? 'Detectando...' : 'Detectar automaticamente'}
+                </Button>
+                {avisosDeteccao.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs text-paper-dim">
+                    {avisosDeteccao.map((texto, indice) => <li key={indice}>{texto}</li>)}
+                  </ul>
+                )}
+              </div>
+
               {tipo === 'DOCX' && (
                 <>
                   <p className="text-xs text-paper-dim">
-                    Para cada campo, digite a tag exata usada no seu .docx (ex.: <code>representante</code> para
+                    Para cada campo, escolha a tag exata usada no seu .docx (ex.: <code>representante</code> para
                     casar com <code>{'{{representante}}'}</code>).
                   </p>
                   <div className="grid grid-cols-2 gap-3">
-                    {CAMPOS_ORGAO_CONHECIDOS.map(campo => (
-                      <div key={campo}>
-                        <label className="mb-1 block text-xs text-paper-dim">{ROTULO_CAMPO_ORGAO[campo]}</label>
-                        <input
-                          type="text"
-                          value={camposDocx[campo] ?? ''}
-                          onChange={e => setCamposDocx({ ...camposDocx, [campo]: e.target.value })}
-                          placeholder="tag"
-                          className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
-                        />
-                      </div>
-                    ))}
+                    {CAMPOS_ORGAO_CONHECIDOS.map(campo =>
+                      usaSelectDocx(campo) ? (
+                        <div key={campo}>
+                          <label className="mb-1 block text-xs text-paper-dim">{ROTULO_CAMPO_ORGAO[campo]}</label>
+                          <select
+                            value={camposDocx[campo] ?? ''}
+                            onChange={e => {
+                              if (e.target.value === '__outra__') {
+                                setCamposDocxTextoLivre(atual => new Set(atual).add(campo));
+                                return;
+                              }
+                              setCamposDocx({ ...camposDocx, [campo]: e.target.value });
+                            }}
+                            className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper"
+                          >
+                            <option value="">— nenhuma —</option>
+                            {(tagsDocxDetectadas ?? []).map(tag => (
+                              <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                            <option value="__outra__">Outra tag (digitar)...</option>
+                          </select>
+                        </div>
+                      ) : (
+                        <div key={campo}>
+                          <label className="mb-1 block text-xs text-paper-dim">{ROTULO_CAMPO_ORGAO[campo]}</label>
+                          <input
+                            type="text"
+                            value={camposDocx[campo] ?? ''}
+                            onChange={e => setCamposDocx({ ...camposDocx, [campo]: e.target.value })}
+                            placeholder="tag"
+                            className="w-full rounded border border-white/10 bg-ink-700 px-3 py-2 text-paper placeholder:text-slate"
+                          />
+                        </div>
+                      )
+                    )}
                   </div>
                   <div className="rounded border border-white/10 bg-ink-700/40 p-3 text-xs text-paper-dim">
                     Bloco de veículos: o template deve ter <code>{'{{#veiculos}} ... {{/veiculos}}'}</code> com as

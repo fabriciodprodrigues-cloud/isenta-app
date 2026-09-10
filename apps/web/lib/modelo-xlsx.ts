@@ -39,7 +39,8 @@ function escaparXml(valor: string): string {
     .replace(/'/g, '&apos;');
 }
 
-function extrairLinhas(sheetDataXml: string): LinhaXml[] {
+/** Exportada pra ser reaproveitada em modelo-deteccao.ts -- uma fonte só de verdade sobre como uma <row> é delimitada. */
+export function extrairLinhas(sheetDataXml: string): LinhaXml[] {
   const linhas: LinhaXml[] = [];
   const regexLinha = /<row\b[^>]*\br="(\d+)"[^>]*(?:\/>|>[\s\S]*?<\/row>)/g;
   let m: RegExpExecArray | null;
